@@ -4,17 +4,17 @@ const chatSchema = mongoose.Schema(
   {
     isGroupChat: {
       type: Boolean,
-      default: false
+      default: false,
     },
     chatName: {
       type: String,
-      trim: true
+      trim: true,
     },
     users: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User"
-      }
+        ref: "User",
+      },
     ],
     latestMessage: {
       type: mongoose.Schema.Types.ObjectId,
@@ -22,12 +22,17 @@ const chatSchema = mongoose.Schema(
     },
     groupAdmin: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User"
+      ref: "User",
     },
     groupPic: {
       type: String,
+      default: "",
     },
   },
   { timestamps: true }
 );
+
+chatSchema.index({ users: 1 });
+chatSchema.index({ updatedAt: -1 });
+
 module.exports = mongoose.model("Chat", chatSchema);

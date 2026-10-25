@@ -1,65 +1,80 @@
-const express = require("express");
-const cors = require("cors");
-const mongoose = require("mongoose");
-const socket = require("socket.io");
+const buffer = require("buffer");
+if (!buffer.SlowBuffer) {
+  buffer.SlowBuffer = function () {};
+  buffer.SlowBuffer.prototype = Buffer.prototype;
+}
 
-const userRoutes = require("./routes/userRoutes");
-const messageRoutes = require("./routes/messagesRoute");
-const chatRoutes = require("./routes/chatRoutes");
-
-const app = express();
 require("dotenv").config();
+const http = require("http");
+const mongoose = require("mongoose");
+const socketio = require("socket.io");
+const app = require("./app");
+const { initializeSocket } = require("./socket");
 
-app.use(cors());
-app.use(express.json());
-app.use("/images", express.static("images"));
-app.use("/api/auth", userRoutes);
-app.use("/api/messages", messageRoutes);
-app.use("/api/chats", chatRoutes);
+const PORT = process.env.PORT || 5000;
+const MONGO_URL = process.env.MONGO_URL || "mongodb://localhost:27017/chat";
 
+const server = http.createServer(app);
 
-mongoose.connect(process.env.MONGO_URL, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-}).then(() => {
+const io = socketio(server, {
+  cors: {
+    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    credentials: true,
+  },
+});
+
+initializeSocket(io);
+
+let isShuttingDown = false;
+
+async function start() {
+  try {
+    await mongoose.connect(MONGO_URL, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
     console.log("DB connected successfully");
-}).catch((err) => {
-    console.log(err.message);
-});
 
+    server.listen(PORT, () => {
+      console.log(`Server started on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error("Failed to connect to MongoDB:", err.message);
+    process.exit(1);
+  }
+}
 
-const server = app.listen(process.env.PORT, () => {
-    console.log(`Server started on port ${process.env.PORT}`);
-});
+async function gracefulShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+  console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
 
-const io = socket(server, {
-    cors: {
-        origin: "http://localhost:3000",
-        credentials: true,
-    },
-});
+  // Close HTTP server to stop accepting new requests
+  server.close(() => {
+    console.log("HTTP server closed.");
+  });
 
+  // Close Socket.IO server
+  io.close(() => {
+    console.log("Socket.IO server closed.");
+  });
 
-//creating sockets
-io.on("connection", (socket) => {
-    console.log("Connected to socket.io");
-    socket.on("setup", (userData) => {
-        socket.join(userData._id);
-        socket.emit("connected");
-    });
-    socket.on("join chat", (room) => {
-        socket.join(room);
-    });
-    socket.on("contacts", (data) => {
-        if (data) {
-            socket.emit("contacts", data);
-        }
-    });
-    socket.on("new message", (newMessageRecieved) => { 
-        socket.in(newMessageRecieved.chatId).emit("message recieved", newMessageRecieved); 
-    });
-    socket.off("setup", () => {
-        console.log("USER DISCONNECTED");
-        socket.leave(userData._id);
-    });
-});
+  // Close MongoDB connection
+  try {
+    await mongoose.connection.close(false);
+    console.log("MongoDB connection closed.");
+    process.exit(0);
+  } catch (err) {
+    console.error("Error closing MongoDB connection:", err.message);
+    process.exit(1);
+  }
+}
+
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+
+if (process.env.NODE_ENV !== "test") {
+  start();
+}
+
+module.exports = { app, server, io, start, gracefulShutdown };
