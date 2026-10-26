@@ -1,3 +1,7 @@
+const dns = require("node:dns");
+
+dns.setServers(["8.8.8.8", "1.1.1.1"]);
+
 const buffer = require("buffer");
 if (!buffer.SlowBuffer) {
   buffer.SlowBuffer = function () {};
@@ -11,8 +15,8 @@ const socketio = require("socket.io");
 const app = require("./app");
 const { initializeSocket } = require("./socket");
 
-const PORT = process.env.PORT || 5000;
-const MONGO_URL = process.env.MONGO_URL || "mongodb://localhost:27017/chat";
+const PORT = process.env.PORT;
+const MONGO_URL = process.env.MONGODB_URL;
 
 const server = http.createServer(app);
 
@@ -23,6 +27,10 @@ const io = socketio(server, {
   },
 });
 
+// Controllers use this instance to publish events only after their database
+// transaction has completed.  Keeping the instance on the Express app also
+// makes the HTTP and Socket.IO lifecycles explicit in tests.
+app.set("io", io);
 initializeSocket(io);
 
 let isShuttingDown = false;

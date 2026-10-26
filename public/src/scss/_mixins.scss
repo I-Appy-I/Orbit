@@ -1,0 +1,49 @@
+@mixin flex_center {
+  display: flex;
+  align-items: center;
+}
+
+@mixin flex_center_center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin flex_between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@mixin grid_center_center {
+  display: grid;
+  align-items: center;
+  justify-content: center;
+}
+
+@mixin img_sm {
+  border-radius: var(--radius-full);
+  height: 36px;
+  width: 36px;
+  object-fit: cover;
+}
+
+@mixin img_md {
+  border-radius: var(--radius-full);
+  height: 44px;
+  width: 44px;
+  object-fit: cover;
+}
+
+@mixin img_lg {
+  border-radius: var(--radius-full);
+  height: 80px;
+  width: 80px;
+  object-fit: cover;
+}
+
+@mixin no_bd_no_bg {
+  border: none;
+  background-color: transparent;
+  outline: none;
+}

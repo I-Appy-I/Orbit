@@ -1,0 +1,106 @@
+.create-group {
+  background-color: rgba(15, 23, 42, 0.42);
+  backdrop-filter: none;
+
+  .modal-container {
+    max-width: 480px;
+
+    .modal-content {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+
+      .inputs {
+        display: flex;
+        flex-direction: column;
+        gap: 0.875rem;
+
+        .modal-input {
+          position: relative;
+          display: flex;
+          align-items: center;
+
+          input {
+            width: 100%;
+            height: 44px;
+            padding: 0 1rem 0 2.5rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 0.925rem;
+            color: var(--text-primary);
+            background-color: var(--bg-subtle);
+            outline: none;
+            transition: var(--transition);
+
+            &:focus {
+              background-color: var(--bg-surface);
+              border-color: var(--primary);
+              box-shadow: 0 0 0 3px var(--primary-glow);
+            }
+          }
+
+          svg {
+            position: absolute;
+            left: 12px;
+            color: var(--text-muted);
+            font-size: 1.15rem;
+            pointer-events: none;
+          }
+        }
+
+        .selected-users-wrapper {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 0.5rem;
+          margin-top: 0.25rem;
+        }
+
+        .contacts {
+          max-height: 180px;
+          overflow-y: auto;
+          border: 1px solid var(--border);
+          border-radius: var(--radius-sm);
+          background-color: var(--bg-surface);
+          box-shadow: var(--shadow-sm);
+
+          .contact {
+            padding: 0.5rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+
+            &:last-child {
+              border-bottom: none;
+            }
+
+            img {
+              width: 32px;
+              height: 32px;
+            }
+
+            h4 {
+              font-size: 0.875rem;
+              font-weight: 500;
+            }
+          }
+        }
+      }
+
+      .button-submit {
+        margin-top: 0.5rem;
+      }
+    }
+  }
+
+  .close-button { position: absolute; top: 1rem; right: 1rem; }
+  .group-field { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); }
+  .group-field input { height: 42px; padding: 0 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font: inherit; }
+  .selected-summary { font-size: 0.85rem; color: var(--text-secondary); }
+  .group-user-list { max-height: 230px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .group-user { display: flex; align-items: center; gap: 0.65rem; padding: 0.55rem 0.75rem; cursor: pointer; border-bottom: 1px solid var(--border); }
+  .group-user:last-child { border-bottom: 0; }
+  .group-user.selected { background: var(--bg-active); }
+  .group-user img { width: 32px; height: 32px; border-radius: var(--radius-full); object-fit: cover; }
+  .group-user span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .create-group-submit { width: 100%; }
+  .group-error { color: var(--danger); padding: 0.75rem; }
+}

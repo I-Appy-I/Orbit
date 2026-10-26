@@ -5,19 +5,37 @@ import { ChatState } from "../context/ChatProvider";
 import { fetchChatsRoute } from "../utils/APIRoutes";
 import { toastOptions } from "../utils/constants";
 import { getSender, getSenderProfilePic } from "../config/ChatLogics";
-import GroupChatCreate from "./Group/CreateGroupChat";
+import Avatar from "./Avatar";
 
 function Contacts({ fetchAgain, selectedChat, socket }) {
   const { setSelectedChat, chats, user, setChats } = ChatState();
   const [loading, setLoading] = useState(false);
-  const [modalActive, setModalActive] = useState('not');
 
   const fetchChats = async () => {
     try {
-      setLoading(true);
+      setLoading(false);
       const config = { headers: { Authorization: `Bearer ${user.token}` } };
       const { data } = await axios.get(`${fetchChatsRoute}`, config);
-      setChats(data);
+      setChats((currentChats) => {
+        const byId = new Map(data.map((chat) => [chat._id, chat]));
+        (currentChats || []).forEach((chat) => {
+          const existing = byId.get(chat._id);
+          if (existing && new Date(chat.updatedAt || 0) >= new Date(existing.updatedAt || 0)) byId.set(chat._id, chat);
+        });
+        const sorted = [...byId.values()].sort((left, right) => new Date(right.updatedAt || 0) - new Date(left.updatedAt || 0));
+        const seenDirectPairs = new Set();
+        return sorted.filter((chat) => {
+          if (chat.isGroupChat) return true;
+          const pairKey = (chat.users || [])
+            .map((u) => String(u._id || u))
+            .sort()
+            .join(":");
+          if (!pairKey) return true;
+          if (seenDirectPairs.has(pairKey)) return false;
+          seenDirectPairs.add(pairKey);
+          return true;
+        });
+      });
       setLoading(false);
     } catch (error) {
       setLoading(true);
@@ -28,41 +46,6 @@ function Contacts({ fetchAgain, selectedChat, socket }) {
     fetchChats(); // eslint-disable-next-line
   }, [fetchAgain]);
 
-
-  const newChat = (data) => {
-    if (chats !== undefined && chats.length !== 0 && data !== undefined) {
-      return chats.map((chat) => {
-        var temp = Object.assign({}, chat);
-        if (temp._id === data._id) temp.latestMessage = data.latestMessage;
-        return temp;
-      });
-    };
-  };
-
-  useEffect(() => {
-    if (!socket.current) return;
-
-    const handleContacts = (data) => {
-      if (!data) return;
-      setChats((prevChats) => {
-        if (!prevChats) return prevChats;
-        return prevChats.map((chat) => {
-          if (chat._id === data._id) {
-            return { ...chat, latestMessage: data.latestMessage };
-          }
-          return chat;
-        });
-      });
-    };
-
-    socket.current.on("contacts", handleContacts);
-
-    return () => {
-      if (socket.current) {
-        socket.current.off("contacts", handleContacts);
-      }
-    };
-  }, [socket]);
 
   return (
     <>
@@ -78,30 +61,31 @@ function Contacts({ fetchAgain, selectedChat, socket }) {
                         <div
                           onClick={() => setSelectedChat(chat)}
                           key={chat._id}
-                          className={`contact ${selectedChat === chat ? "selected" : ""}`}
+                          className={`contact ${selectedChat?._id === chat._id ? "selected" : ""}`}
                         >
                           <div className="avatar" >
-                            <img src={process.env.REACT_APP_PROFILE_PICS_PATHS +
-                              (chat.isGroupChat
+                            <Avatar image={chat.isGroupChat
                                 ? chat.groupPic
-                                : getSenderProfilePic(user, chat.users))}
+                                : getSenderProfilePic(user, chat.users)}
                               alt={chat.isGroupChat
                                 ? chat.chatName
                                 : getSender(user, chat.users)}
                             />
                           </div>
                           <div className="grid-wrapper">
-                            <h4 className="chat-name">
-                              {chat.isGroupChat ? chat.chatName : getSender(user, chat.users)}
-                            </h4>
-                            {chat.latestMessage && (
-                              <span className="time">
-                                {chat.latestMessage.createdAt.split('.')[0].split('T')[1].split(':', 2).join(':')}
-                              </span>
-                            )}
+                            <div className="contact-header">
+                              <h4 className="chat-name">
+                                {chat.isGroupChat ? chat.chatName : getSender(user, chat.users)}
+                              </h4>
+                              {chat.latestMessage && (
+                                <span className="time">
+                                  {chat.latestMessage.createdAt.split('.')[0].split('T')[1].split(':', 2).join(':')}
+                                </span>
+                              )}
+                            </div>
                             {chat.latestMessage && (
                               <div className="lattest-message">
-                                <span className="sender">{chat.latestMessage.sender.username} : </span>
+                                <span className="sender">{chat.latestMessage.sender.username}: </span>
                                 {chat.latestMessage.content.length !== 0
                                   ? (
                                     <span className="content">
@@ -110,7 +94,7 @@ function Contacts({ fetchAgain, selectedChat, socket }) {
                                         : chat.latestMessage.content}
                                     </span>
                                   )
-                                  : (<span className="file">Photo</span>)
+                                  : (<span className="file">📷 Photo</span>)
                                 }
                               </div>
                             )}
@@ -118,10 +102,6 @@ function Contacts({ fetchAgain, selectedChat, socket }) {
                         </div>
                       )
                     })}
-                  </div>
-                  <div className='add-group-chat' onClick={() => { setModalActive('active') }}>
-                    <button className="icon-button">+</button>
-                    <span className="tooltiptext">New group chat</span>
                   </div>
                 </>
               )
@@ -137,9 +117,6 @@ function Contacts({ fetchAgain, selectedChat, socket }) {
           </div>
         </div>
       </div>
-      {modalActive === 'active' &&
-        <GroupChatCreate setModalActive={setModalActive} />
-      }
       <ToastContainer />
     </>
   )

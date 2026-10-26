@@ -12,6 +12,7 @@ const multer = require("multer");
 const userRoutes = require("./routes/userRoutes");
 const messageRoutes = require("./routes/messagesRoute");
 const chatRoutes = require("./routes/chatRoutes");
+const blockRoutes = require("./routes/blockRoutes");
 
 const app = express();
 
@@ -26,6 +27,7 @@ app.use("/images", express.static(path.join(__dirname, "images")));
 app.use("/api/auth", userRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/chats", chatRoutes);
+app.use("/api/blocks", blockRoutes);
 
 // 404 Handler
 app.use((req, res, next) => {

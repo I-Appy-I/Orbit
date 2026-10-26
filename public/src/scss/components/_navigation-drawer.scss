@@ -1,0 +1,225 @@
+// Telegram-inspired Navigation Drawer Styles
+
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 1000;
+  display: flex;
+  animation: drawerBackdropFadeIn 0.2s ease-out;
+
+  .drawer-content {
+    width: 290px;
+    max-width: 85vw;
+    height: 100%;
+    background-color: var(--bg-surface);
+    color: var(--text-primary);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    animation: drawerSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 1001;
+    border-right: 1px solid var(--border);
+  }
+
+  // Profile Section at top
+  .drawer-profile {
+    padding: 1.25rem 1.25rem 1rem 1.25rem;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-hover) 100%);
+    color: #ffffff;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+    outline: none;
+    transition: var(--transition);
+    user-select: none;
+
+    &:hover {
+      filter: brightness(1.05);
+    }
+
+    &:focus-visible {
+      box-shadow: inset 0 0 0 2px #ffffff;
+    }
+
+    .drawer-avatar-wrapper {
+      .drawer-avatar {
+        width: 56px;
+        height: 56px;
+        border-radius: var(--radius-full);
+        object-fit: cover;
+        border: 2px solid rgba(255, 255, 255, 0.4);
+        display: block;
+      }
+    }
+
+    .drawer-user-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+
+      .drawer-username {
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: #ffffff;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .drawer-action-hint {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.85);
+
+        .drawer-settings-icon {
+          font-size: 1.05rem;
+        }
+      }
+    }
+  }
+
+  // Menu List
+  .drawer-nav {
+    padding: 0.5rem 0;
+    flex: 1;
+
+    .drawer-menu-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+
+      li {
+        margin: 0;
+        padding: 0;
+      }
+    }
+
+    .drawer-menu-item {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 1.15rem;
+      padding: 0.8rem 1.25rem;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      text-align: left;
+      font-family: inherit;
+      font-size: 0.925rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      transition: var(--transition);
+
+      &:hover {
+        background-color: var(--bg-hover);
+        color: var(--primary);
+
+        .drawer-icon {
+          color: var(--primary);
+        }
+      }
+
+      &:focus-visible {
+        outline: 2px solid var(--primary);
+        outline-offset: -2px;
+      }
+
+      .drawer-icon {
+        font-size: 1.35rem;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        flex-shrink: 0;
+        transition: var(--transition);
+      }
+
+      .drawer-label {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      // Toggle Switch in Night Mode Item
+      &.drawer-menu-item--theme {
+        .drawer-toggle-switch {
+          width: 36px;
+          height: 20px;
+          border-radius: 10px;
+          background-color: var(--border);
+          position: relative;
+          transition: var(--transition);
+          flex-shrink: 0;
+
+          &.is-dark {
+            background-color: var(--primary);
+
+            .drawer-toggle-thumb {
+              transform: translateX(16px);
+            }
+          }
+
+          .drawer-toggle-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background-color: #ffffff;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+          }
+        }
+      }
+
+      // Logout Danger Item
+      &.drawer-menu-item--danger {
+        &:hover {
+          background-color: var(--danger-light);
+          color: var(--danger);
+
+          .drawer-icon {
+            color: var(--danger);
+          }
+        }
+      }
+    }
+
+    .drawer-divider {
+      height: 1px;
+      background-color: var(--border);
+      margin: 0.4rem 0;
+    }
+  }
+}
+
+@keyframes drawerBackdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes drawerSlideIn {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}

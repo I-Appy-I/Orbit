@@ -26,6 +26,7 @@ describe("Resource Authorization & IDOR Protection", () => {
       username: "userAlice",
       email: "alice@example.com",
       password: "passwordA",
+      emailVerified: true,
     });
     tokenA = generateToken(userA._id);
 
@@ -33,6 +34,7 @@ describe("Resource Authorization & IDOR Protection", () => {
       username: "userBob",
       email: "bob@example.com",
       password: "passwordB",
+      emailVerified: true,
     });
     tokenB = generateToken(userB._id);
   });
@@ -90,6 +92,7 @@ describe("Resource Authorization & IDOR Protection", () => {
         username: "userCharlie",
         email: "charlie@example.com",
         password: "passwordC",
+        emailVerified: true,
       });
 
       privateChat = await Chat.create({
@@ -169,6 +172,7 @@ describe("Resource Authorization & IDOR Protection", () => {
         username: "userDavid",
         email: "david@example.com",
         password: "passwordD",
+        emailVerified: true,
       });
 
       const res = await request(app)
@@ -194,6 +198,126 @@ describe("Resource Authorization & IDOR Protection", () => {
       expect(res.status).toBe(200);
       const chat = await Chat.findById(groupChat._id);
       expect(chat.chatName).toBe("Alice's Awesome Club");
+    });
+
+    it("preserves legacy group admins and allows multiple admins to manage the group", async () => {
+      expect(groupChat.groupAdmins).toHaveLength(0); // legacy persisted shape
+      const promoted = await request(app)
+        .put("/api/chats/groupadmin")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({ chatId: groupChat._id.toString(), userId: userB._id.toString(), action: "promote" });
+      expect(promoted.status).toBe(200);
+      expect(promoted.body.groupAdmins.map((admin) => admin._id.toString())).toContain(userA._id.toString());
+      expect(promoted.body.groupAdmins.map((admin) => admin._id.toString())).toContain(userB._id.toString());
+
+      const renamed = await request(app)
+        .put("/api/chats/rename")
+        .set("Authorization", `Bearer ${tokenB}`)
+        .send({ chatId: groupChat._id.toString(), chatName: "Shared administration" });
+      expect(renamed.status).toBe(200);
+      expect(renamed.body.chatName).toBe("Shared administration");
+    });
+
+    it("returns a canonical admin array for legacy groups during chat-list fetch", async () => {
+      const response = await request(app).get("/api/chats/fetchChats").set("Authorization", `Bearer ${tokenA}`);
+      expect(response.status).toBe(200);
+      const fetchedGroup = response.body.find((chat) => chat._id === groupChat._id.toString());
+      expect(fetchedGroup.groupAdmins.map((admin) => admin._id.toString())).toContain(userA._id.toString());
+    });
+
+    it("rejects role changes from non-admins and protects the last administrator", async () => {
+      const outsider = await User.create({ username: "userOutsider", email: "outsider@example.com", password: "passwordX", emailVerified: true });
+      const outsiderPromotion = await request(app)
+        .put("/api/chats/groupadmin")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({ chatId: groupChat._id.toString(), userId: outsider._id.toString(), action: "promote" });
+      expect(outsiderPromotion.status).toBe(400);
+
+      const rejectPromotion = await request(app)
+        .put("/api/chats/groupadmin")
+        .set("Authorization", `Bearer ${tokenB}`)
+        .send({ chatId: groupChat._id.toString(), userId: userB._id.toString(), action: "promote" });
+      expect(rejectPromotion.status).toBe(403);
+
+      const rejectDemotion = await request(app)
+        .put("/api/chats/groupadmin")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({ chatId: groupChat._id.toString(), userId: userA._id.toString(), action: "demote" });
+      expect(rejectDemotion.status).toBe(400);
+
+      const rejectLastAdminLeave = await request(app)
+        .put("/api/chats/groupremove")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({ chatId: groupChat._id.toString(), userId: userA._id.toString() });
+      expect(rejectLastAdminLeave.status).toBe(400);
+    });
+
+    it("removes a departing administrator from the admin list when another admin remains", async () => {
+      await request(app).put("/api/chats/groupadmin")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({ chatId: groupChat._id.toString(), userId: userB._id.toString(), action: "promote" });
+      const removed = await request(app).put("/api/chats/groupremove")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({ chatId: groupChat._id.toString(), userId: userB._id.toString() });
+      expect(removed.status).toBe(200);
+      expect(removed.body.users.map((member) => member._id.toString())).not.toContain(userB._id.toString());
+      expect(removed.body.groupAdmins.map((admin) => admin._id.toString())).not.toContain(userB._id.toString());
+      expect(removed.body.groupAdmins[0]._id.toString()).toBe(userA._id.toString());
+    });
+
+    it("allows a member to exit only their own group membership and preserves the last admin", async () => {
+      const lastAdminExit = await request(app)
+        .put("/api/chats/groupexit")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({ chatId: groupChat._id.toString() });
+      expect(lastAdminExit.status).toBe(400);
+
+      const outsider = await User.create({ username: "userOutsider2", email: "outsider2@example.com", password: "passwordX", emailVerified: true });
+      const outsiderToken = generateToken(outsider._id);
+      const rejectOutsider = await request(app)
+        .put("/api/chats/groupexit")
+        .set("Authorization", `Bearer ${outsiderToken}`)
+        .send({ chatId: groupChat._id.toString() });
+      expect(rejectOutsider.status).toBe(403);
+
+      const promote = await request(app)
+        .put("/api/chats/groupadmin")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({ chatId: groupChat._id.toString(), userId: userB._id.toString(), action: "promote" });
+      expect(promote.status).toBe(200);
+
+      const exit = await request(app)
+        .put("/api/chats/groupexit")
+        .set("Authorization", `Bearer ${tokenB}`)
+        // The endpoint must ignore a supplied target ID and only remove the authenticated member.
+        .send({ chatId: groupChat._id.toString(), userId: userA._id.toString() });
+      expect(exit.status).toBe(200);
+      const persisted = await Chat.findById(groupChat._id);
+      expect(persisted.users.map(String)).toContain(userA._id.toString());
+      expect(persisted.users.map(String)).not.toContain(userB._id.toString());
+      expect(persisted.groupAdmins.map(String)).toContain(userA._id.toString());
+      expect(persisted.groupAdmins.map(String)).not.toContain(userB._id.toString());
+    });
+
+    it("deletes a group and its messages when the sole administrator exits as its last member", async () => {
+      const unauthorizedDelete = await request(app).put("/api/chats/deleteChat")
+        .set("Authorization", `Bearer ${tokenB}`)
+        .send({ chatId: groupChat._id.toString() });
+      expect(unauthorizedDelete.status).toBe(403);
+
+      const removeMember = await request(app).put("/api/chats/groupremove")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({ chatId: groupChat._id.toString(), userId: userB._id.toString() });
+      expect(removeMember.status).toBe(200);
+
+      const groupMessage = await Messages.create({ chat: groupChat._id, sender: userA._id, content: "Group history" });
+      const exit = await request(app).put("/api/chats/groupexit")
+        .set("Authorization", `Bearer ${tokenA}`)
+        .send({ chatId: groupChat._id.toString() });
+      expect(exit.status).toBe(200);
+      expect(exit.body.deleted).toBe(true);
+      expect(await Chat.findById(groupChat._id)).toBeNull();
+      expect(await Messages.findById(groupMessage._id)).toBeNull();
     });
   });
 });

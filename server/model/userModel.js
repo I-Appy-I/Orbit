@@ -29,7 +29,29 @@ const userSchema = new mongoose.Schema(
             required: true,
             default: false,
         },
+        emailVerified: {
+            type: Boolean,
+            required: true,
+            default: false,
+        },
+        emailVerificationTokenHash: {
+            type: String,
+            select: false,
+        },
+        emailVerificationExpires: {
+            type: Date,
+        },
+        emailVerificationAttempts: {
+            type: Number,
+            default: 0,
+            select: false,
+        },
+        emailVerificationLastSent: {
+            type: Date,
+        },
     }
 );
+
+userSchema.index({ emailVerificationTokenHash: 1 }, { sparse: true });
 
 module.exports = mongoose.model("User", userSchema);

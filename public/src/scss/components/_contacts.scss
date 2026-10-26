@@ -1,0 +1,175 @@
+.contacts-container,
+.search {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  height: 100%;
+
+  .contacts {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+
+    .contact {
+      display: flex;
+      align-items: center;
+      gap: 0.875rem;
+      padding: 0.75rem 1rem;
+      cursor: pointer;
+      border-bottom: 1px solid var(--border);
+      transition: background-color 0.15s ease;
+      position: relative;
+
+      &:hover {
+        background-color: var(--bg-hover);
+      }
+
+      &.selected {
+        background-color: var(--bg-active);
+
+        &::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          width: 3px;
+          background-color: var(--primary);
+          border-radius: 0 4px 4px 0;
+        }
+
+        .chat-name {
+          color: var(--primary);
+        }
+      }
+
+      .avatar {
+        position: relative;
+        flex-shrink: 0;
+
+        img {
+          @include img_md;
+          border: 1px solid var(--border);
+        }
+      }
+
+      .grid-wrapper {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-width: 0;
+        gap: 0.2rem;
+
+        .contact-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 0.5rem;
+          min-width: 0;
+        }
+
+        .chat-name {
+          font-size: 0.925rem;
+          font-weight: 600;
+          color: var(--text-primary);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .time {
+          font-size: 0.725rem;
+          color: var(--text-muted);
+          flex-shrink: 0;
+          font-weight: 400;
+        }
+
+        .lattest-message {
+          display: flex;
+          align-items: center;
+          gap: 0.25rem;
+          font-size: 0.825rem;
+          color: var(--text-secondary);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+
+          .sender {
+            font-weight: 500;
+            color: var(--text-primary);
+            flex-shrink: 0;
+          }
+
+          .content {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .file {
+            color: var(--primary);
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.2rem;
+          }
+        }
+      }
+    }
+  }
+
+  // Add Group Button Floating / Fixed
+  .add-group-chat {
+    position: absolute;
+    bottom: 1.25rem;
+    right: 1.25rem;
+    z-index: 5;
+
+    .icon-button {
+      width: 46px;
+      height: 46px;
+      border-radius: var(--radius-full);
+      background-color: var(--primary);
+      color: #ffffff;
+      box-shadow: var(--shadow-lg);
+      padding: 0;
+      line-height: 1;
+      font-size: 1.3rem;
+      transition: var(--transition);
+
+      &:hover {
+        background-color: var(--primary-hover);
+        transform: translateY(-2px) scale(1.05);
+        box-shadow: 0 12px 20px -3px var(--primary-glow);
+      }
+
+      &:active {
+        transform: translateY(0) scale(0.98);
+      }
+    }
+
+    .tooltiptext {
+      bottom: 56px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+  }
+}
+
+.contact-action {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg-surface);
+  color: var(--primary);
+  font: inherit;
+  font-size: 0.775rem;
+  font-weight: 700;
+  cursor: pointer;
+
+  &:hover:not(:disabled) { background: var(--primary-light); }
+  &:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+  &:disabled { opacity: 0.65; cursor: wait; }
+}

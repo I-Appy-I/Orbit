@@ -1,1 +1,8 @@
-node_modules
+node_modules/
+.env
+.env.*
+!.env.example
+images/attachments/*
+!images/attachments/.gitkeep
+images/profile_pictures/*
+!images/profile_pictures/.gitkeep

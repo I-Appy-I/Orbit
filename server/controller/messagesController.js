@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Messages = require("../model/messageModel");
 const User = require("../model/userModel");
 const Chat = require("../model/chatModel");
+const Block = require("../model/blockModel");
 
 module.exports.getMessages = async (req, res, next) => {
   try {
@@ -103,6 +104,22 @@ module.exports.addMessage = async (req, res, next) => {
       return res.status(403).json({ message: "Not authorized to send messages to this chat" });
     }
 
+    if (!chat.isGroupChat) {
+      const peer = chat.users.find((memberId) => memberId.toString() !== req.user._id.toString());
+      const blocked = peer && await Block.exists({
+        $or: [
+          { blocker: req.user._id, blockedUser: peer },
+          { blocker: peer, blockedUser: req.user._id },
+        ],
+      });
+      if (blocked) {
+        return res.status(403).json({
+          message: "You can't message this contact while direct messaging is blocked.",
+          code: "DIRECT_MESSAGE_BLOCKED",
+        });
+      }
+    }
+
     // Sender is strictly taken from verified req.user, never trusted from client
     const newMessage = {
       sender: req.user._id,
@@ -129,7 +146,23 @@ module.exports.addMessage = async (req, res, next) => {
         ],
       });
 
-    return res.status(201).json(message);
+    // The REST response is the authoritative acknowledgement for the sender.
+    // Only a successfully persisted, populated message is ever broadcast.
+    res.status(201).json(message);
+
+    const io = req.app.get("io");
+    if (io) {
+      const room = chatId.toString();
+      io.to(room).emit("message recieved", message);
+      const updatedChat = message.chat;
+      // Per-user rooms include every active socket for each participant,
+      // including a recipient who has never joined this chat room.
+      for (const participant of chat.users) {
+        io.to(participant.toString()).emit("contacts", updatedChat);
+      }
+    }
+
+    return undefined;
   } catch (error) {
     return next(error);
   }

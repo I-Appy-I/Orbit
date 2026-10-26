@@ -30,6 +30,10 @@ function initializeSocket(io) {
         return next(new Error("Authentication error: User not found"));
       }
 
+      if (!user.emailVerified) {
+        return next(new Error("Authentication error: Email not verified"));
+      }
+
       // Attach verified user to socket instance
       socket.user = user;
       return next();
@@ -78,50 +82,14 @@ function initializeSocket(io) {
       }
     });
 
-    // Secure message broadcast
-    socket.on("new message", async (newMessageReceived) => {
-      try {
-        if (!newMessageReceived) return;
-
-        // Extract chat ID from payload
-        const chatId =
-          newMessageReceived.chatId ||
-          (newMessageReceived.chat && (newMessageReceived.chat._id || newMessageReceived.chat));
-
-        if (!chatId || !mongoose.Types.ObjectId.isValid(chatId)) {
-          return;
-        }
-
-        // Verify sender authorization for this chat
-        const chat = await Chat.findById(chatId);
-        if (!chat) return;
-
-        const isMember = chat.users.some((u) => u.toString() === userId);
-        if (!isMember) return;
-
-        // Broadcast only to the authorized conversation room (excluding sender)
-        socket.to(chatId.toString()).emit("message recieved", newMessageReceived);
-      } catch (err) {
-        // Silently catch to prevent crashing socket worker
-      }
-    });
-
-    // Secure contact list update broadcast
-    socket.on("contacts", async (chatData) => {
-      try {
-        if (!chatData) return;
-        const chatId = chatData._id || chatData.chatId;
-
-        if (chatId && mongoose.Types.ObjectId.isValid(chatId)) {
-          const chat = await Chat.findById(chatId);
-          if (chat && chat.users.some((u) => u.toString() === userId)) {
-            // Broadcast update to the chat room so all active participants see latest message
-            socket.to(chatId.toString()).emit("contacts", chatData);
-          }
-        }
-      } catch (err) {
-        // Silently catch
-      }
+    // Message creation intentionally has no client Socket.IO producer.  The
+    // authenticated HTTP endpoint persists the message and then emits the
+    // legacy "message recieved" event with that saved document.  Accepting a
+    // client-supplied document here would let a client claim a fake success.
+    socket.on("new message", () => {
+      socket.emit("socket_error", {
+        message: "Send messages through the authenticated messages endpoint",
+      });
     });
 
     // Proper disconnect cleanup

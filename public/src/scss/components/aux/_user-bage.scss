@@ -1,0 +1,41 @@
+.user-badge-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  background-color: var(--primary-light);
+  color: var(--primary);
+  border: 1px solid var(--primary-glow);
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: var(--transition);
+
+  span {
+    font-size: 0.725rem;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+
+  button {
+    @include no_bd_no_bg;
+    @include flex_center_center;
+    width: 18px;
+    height: 18px;
+    border-radius: var(--radius-full);
+    cursor: pointer;
+    color: var(--primary);
+    transition: var(--transition);
+
+    svg {
+      font-size: 0.9rem;
+      path {
+        stroke: var(--primary);
+      }
+    }
+
+    &:hover {
+      background-color: var(--primary-glow);
+    }
+  }
+}

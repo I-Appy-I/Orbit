@@ -1,0 +1,70 @@
+# Dependencies
+node_modules/
+*/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment and Secret Files
+.env
+.env.*
+*.env
+*.env.*
+!.env.example
+!*.env.example
+!server/.env.example
+!public/.env.example
+
+# Production Build Artifacts
+build/
+dist/
+public/build/
+build/Release
+
+# Testing & Coverage
+coverage/
+.nyc_output/
+lib-cov/
+
+# Logs & Runtime
+logs/
+*.log
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Cache & Temporary Files
+.eslintcache
+.npm/
+.node_repl_history
+*.tgz
+.yarn-integrity
+.grunt/
+bower_components/
+.lock-wscript
+
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE & Editor Settings
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+
+# Local User Uploaded Media (Preserve Directory Structure via .gitkeep)
+server/images/attachments/*
+!server/images/attachments/.gitkeep
+server/images/profile_pictures/*
+!server/images/profile_pictures/.gitkeep

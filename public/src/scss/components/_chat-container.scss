@@ -1,0 +1,201 @@
+.right-side {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  background-color: var(--bg-surface);
+  overflow: hidden;
+
+  // Active Chat Header
+  .chat-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    padding: 0 1.25rem;
+    background-color: var(--bg-surface);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    gap: 0.75rem;
+    position: relative;
+    z-index: 10;
+
+    .back-button {
+      font-size: 1.25rem;
+      width: 36px;
+      height: 36px;
+      margin-right: -0.25rem;
+
+      @media (min-width: 769px) {
+        display: none;
+      }
+    }
+
+    .user-details {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex: 1;
+      min-width: 0;
+
+      .avatar img {
+        @include img_sm;
+        border: 1px solid var(--border);
+      }
+
+      .username {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+
+        h3 {
+          font-size: 0.975rem;
+          font-weight: 600;
+          color: var(--text-primary);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .chat-subtitle {
+          font-size: 0.75rem;
+          color: var(--text-muted);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+      }
+    }
+
+    .chat-menu {
+      position: relative;
+
+      .icon-button {
+        color: var(--text-secondary);
+
+        &.active, &:hover {
+          color: var(--primary);
+          background-color: var(--bg-hover);
+        }
+      }
+    }
+
+    // Dropdown Action Menu
+    .chat-menu-toggle {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 1rem;
+      background: var(--bg-surface);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-xl);
+      border: 1px solid var(--border);
+      min-width: 170px;
+      padding: 0.35rem;
+      z-index: 50;
+      animation: scaleUp 0.15s ease-out;
+
+      .list-item {
+        @include no_bd_no_bg;
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        width: 100%;
+        padding: 0.6rem 0.85rem;
+        border-radius: var(--radius-xs);
+        font-family: inherit;
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: var(--transition);
+
+        svg {
+          font-size: 1rem;
+          color: var(--text-muted);
+        }
+
+        &:hover {
+          background-color: var(--bg-hover);
+          color: var(--text-primary);
+
+          svg {
+            color: var(--primary);
+          }
+        }
+
+        &.danger {
+          color: var(--danger);
+
+          svg {
+            color: var(--danger);
+          }
+
+          &:hover {
+            background-color: var(--danger-light);
+          }
+        }
+      }
+    }
+  }
+}
+
+.blocked-notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.55rem 1rem;
+  background: var(--bg-subtle);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  text-align: center;
+  font-size: 0.825rem;
+
+  button {
+    border: 0;
+    background: transparent;
+    color: var(--primary);
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+}
+
+.contact-preview {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 1.5rem;
+  color: var(--text-secondary);
+  text-align: center;
+
+  > img {
+    width: 76px;
+    height: 76px;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-full);
+    object-fit: cover;
+  }
+
+  h2 { margin: 0; color: var(--text-primary); }
+  p { margin: 0; font-size: 0.9rem; }
+
+  button {
+    min-height: 40px;
+    padding: 0.5rem 1rem;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: var(--primary);
+    color: #ffffff;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+}

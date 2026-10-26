@@ -26,6 +26,7 @@ describe("Messages API, Sender Enforcement & Pagination", () => {
       username: "userOne",
       email: "one@example.com",
       password: "password1",
+      emailVerified: true,
     });
     token1 = generateToken(user1._id);
 
@@ -33,6 +34,7 @@ describe("Messages API, Sender Enforcement & Pagination", () => {
       username: "userTwo",
       email: "two@example.com",
       password: "password2",
+      emailVerified: true,
     });
     token2 = generateToken(user2._id);
 

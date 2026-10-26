@@ -6,6 +6,9 @@ if (!buffer.SlowBuffer) {
 
 process.env.JWT_SECRET = "test_secret_for_chat_app_12345";
 process.env.NODE_ENV = "test";
+if (typeof jest !== "undefined") {
+  jest.setTimeout(30000);
+}
 
 const mongoose = require("mongoose");
 const { MongoMemoryServer } = require("mongodb-memory-server");

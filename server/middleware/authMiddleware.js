@@ -14,6 +14,13 @@ module.exports.protect = async (req, res, next) => {
       if (!req.user) {
         return res.status(401).json({ message: "Not authorized, user not found" });
       }
+      if (!req.user.emailVerified) {
+        return res.status(403).json({
+          message: "Email verification required",
+          status: false,
+          emailVerified: false,
+        });
+      }
       return next();
     } catch (error) {
       return res.status(401).json({ message: "Not authorized, token failed" });
