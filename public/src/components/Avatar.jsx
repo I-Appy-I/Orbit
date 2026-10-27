@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
 import defaultAvatar from "../assets/default-avatar.svg";
+import { host } from "../utils/APIRoutes";
 
 const getImageUrl = (image) => {
   if (!image || image === "default.svg") return "";
-  return `${process.env.REACT_APP_PROFILE_PICS_PATHS}${image}`;
+  const basePath = process.env.REACT_APP_PROFILE_PICS_PATHS || `${host}/images/profile_pictures/`;
+  const cleanBase = basePath.endsWith("/") ? basePath : `${basePath}/`;
+  return `${cleanBase}${image}`;
 };
 
 function Avatar({ image, alt, className }) {

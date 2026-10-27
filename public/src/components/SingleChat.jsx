@@ -4,7 +4,7 @@ import { ToastContainer, toast } from "react-toastify";
 import axios from "axios";
 
 import { ChatState } from "../context/ChatProvider";
-import { recieveMessageRoute, sendMessageRoute } from "../utils/APIRoutes";
+import { recieveMessageRoute, sendMessageRoute, getAttachmentUrl } from "../utils/APIRoutes";
 import { toastOptions } from "../utils/constants";
 import {
     isGroupRecieved,
@@ -288,7 +288,7 @@ function SingleChat({ fetchAgain, socket, setFetchAgain, selectedChat, blocked, 
                                                     ) : null}
                                                     {message.attachment && message.attachment.length > 0 ? (
                                                         <img
-                                                            src={process.env.REACT_APP_ATTACHMENT_PATHS + message.attachment}
+                                                            src={getAttachmentUrl(message.attachment, user?.token)}
                                                             alt={message.sender?.username || "attachment"}
                                                         />
                                                     ) : null}

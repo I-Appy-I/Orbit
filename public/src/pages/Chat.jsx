@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
 import "react-toastify/dist/ReactToastify.css";
 import { ToastContainer, toast } from "react-toastify";
 import { SlMagnifier } from "react-icons/sl";
@@ -10,7 +11,7 @@ import { io } from "socket.io-client";
 import axios from "axios";
 
 import { ChatState } from "../context/ChatProvider";
-import { allUsersRoute, host } from "../utils/APIRoutes";
+import { allUsersRoute, host, socketHost } from "../utils/APIRoutes";
 import { toastOptions } from "../utils/constants";
 
 import ChatContainer from "../components/ChatContainer";
@@ -26,15 +27,34 @@ import Robot from "../assets/robot.gif";
 function Chat() {
   const socket = useRef();
   const groupCreateTriggerRef = useRef();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [fetchAgain, setFetchAgain] = useState(false);
   const [searchResults, setSearchResult] = useState([]);
   const [search, setSearch] = useState('');
   const [navState, setNavState] = useState("start");
-  const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
+  const [profileSettingsOpen, setProfileSettingsOpen] = useState(() => {
+    return (
+      location.state?.openProfileSettings === true ||
+      searchParams.get("openProfile") === "true"
+    );
+  });
   const [groupCreateOpen, setGroupCreateOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const searchRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    if (location.state?.openProfileSettings === true || searchParams.get("openProfile") === "true") {
+      setProfileSettingsOpen(true);
+    }
+  }, [location.state, searchParams]);
+
+  useEffect(() => {
+    if (location.state?.emailUpdatedMessage) {
+      toast.success(location.state.emailUpdatedMessage, toastOptions);
+    }
+  }, [location.state]);
 
   const { selectedChat, user, setUser, logout, setChats, setSelectedChat } = ChatState();
   const socketToken = user?.token;
@@ -95,7 +115,13 @@ function Chat() {
   //socket connection
   useEffect(() => {
     if (socketToken) {
-      socket.current = io(host, {
+      socket.current = io(socketHost || host, {
+        transports: ["websocket", "polling"],
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
         auth: {
           token: socketToken,
         },

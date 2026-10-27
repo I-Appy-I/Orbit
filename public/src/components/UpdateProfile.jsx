@@ -29,7 +29,8 @@ function UpdateProfile({ fetchAgain, setFetchAgain, onClose }) {
     const deleteRequestInFlight = useRef(false);
     //new values 
     const [newUsername, setNewUsername] = useState();
-    const [newEmail, setNewEmail] = useState();
+    const [newEmail, setNewEmail] = useState("");
+    const [emailLoading, setEmailLoading] = useState(false);
     const [oldPassword, setOldPassword] = useState();
     const [newPassword, setNewPassword] = useState();
     const [newPasswordConfirm, setNewPasswordConfirm] = useState();
@@ -78,9 +79,25 @@ function UpdateProfile({ fetchAgain, setFetchAgain, onClose }) {
     };
 
     const handleEmail = async () => {
-        setShowEmailInput(false);
-        if (!newEmail) return;
+        if (!newEmail || typeof newEmail !== "string" || !newEmail.trim()) {
+            toast.error("Please enter a new email address", toastOptions);
+            return;
+        }
+
+        const cleanEmail = newEmail.trim().toLowerCase();
+        if (cleanEmail === (user?.email || "").toLowerCase()) {
+            toast.error("New email cannot be the same as your current email", toastOptions);
+            return;
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(cleanEmail)) {
+            toast.error("Please provide a valid email address", toastOptions);
+            return;
+        }
+
         try {
+            setEmailLoading(true);
             const config = {
                 headers: {
                     Authorization: `Bearer ${user.token}`,
@@ -89,20 +106,31 @@ function UpdateProfile({ fetchAgain, setFetchAgain, onClose }) {
             const { data } = await axios.put(
                 `${emailUpdateRoute}`,
                 {
-                    userId: user._id,
-                    newEmail: newEmail,
+                    newEmail: cleanEmail,
                 },
                 config
             );
-            setUser(data.updatedUser)
-            handleLocalStorage(data);
-            toast.success("your email was changed successfully", toastOptions);
-            setFetchAgain(!fetchAgain);
+
+            if (data.status) {
+                toast.success(data.msg || "Verification code sent to your new email!", toastOptions);
+                setShowEmailInput(false);
+                setNewEmail("");
+                if (typeof onClose === "function") {
+                    onClose();
+                }
+                navigate(`/verify-email?mode=email-change&email=${encodeURIComponent(cleanEmail)}`);
+            } else {
+                toast.error(data.msg || "Failed to request email change", toastOptions);
+            }
         } catch (error) {
-            toast.error(error.response.data.message, toastOptions);
+            const errorMsg =
+                error.response?.data?.msg ||
+                error.response?.data?.message ||
+                "Failed to send verification code. Please try again.";
+            toast.error(errorMsg, toastOptions);
+        } finally {
+            setEmailLoading(false);
         }
-        setNewEmail("");
-        setShowEmailInput(false);
     };
 
     const imageUpload = async (event) => {
@@ -226,12 +254,21 @@ function UpdateProfile({ fetchAgain, setFetchAgain, onClose }) {
                             }
                             {showEmailInput
                                 ? (<div className="modal-input">
-                                    <input type="email" placeholder={user.email}
+                                    <input
+                                        type="email"
+                                        placeholder={user.email}
                                         value={newEmail}
                                         onChange={(e) => setNewEmail(e.target.value)}
+                                        disabled={emailLoading}
                                     />
                                     <FiMail />
-                                    <button className="button-submit" onClick={handleEmail}>Save</button>
+                                    <button
+                                        className="button-submit"
+                                        onClick={handleEmail}
+                                        disabled={emailLoading}
+                                    >
+                                        {emailLoading ? "Sending..." : "Save"}
+                                    </button>
                                 </div>)
                                 : (<div className="modal-input not-show">
                                     <span>Email: </span>

@@ -1,4 +1,6 @@
 const mongoose = require("mongoose");
+const path = require("path");
+const fs = require("fs");
 const Messages = require("../model/messageModel");
 const User = require("../model/userModel");
 const Chat = require("../model/chatModel");
@@ -46,7 +48,7 @@ module.exports.getMessages = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
-      .populate("sender", "username profilePic email")
+      .populate("sender", "username profilePic")
       .populate({
         path: "chat",
         populate: { path: "latestMessage", populate: { path: "sender", select: "username profilePic" } },
@@ -137,17 +139,16 @@ module.exports.addMessage = async (req, res, next) => {
     );
 
     message = await Messages.findById(message._id)
-      .populate("sender", "username profilePic email")
+      .populate("sender", "username profilePic")
       .populate({
         path: "chat",
         populate: [
-          { path: "users", select: "username profilePic email" },
+          { path: "users", select: "username profilePic" },
           { path: "latestMessage", populate: { path: "sender", select: "username profilePic" } },
         ],
       });
 
     // The REST response is the authoritative acknowledgement for the sender.
-    // Only a successfully persisted, populated message is ever broadcast.
     res.status(201).json(message);
 
     const io = req.app.get("io");
@@ -155,14 +156,55 @@ module.exports.addMessage = async (req, res, next) => {
       const room = chatId.toString();
       io.to(room).emit("message recieved", message);
       const updatedChat = message.chat;
-      // Per-user rooms include every active socket for each participant,
-      // including a recipient who has never joined this chat room.
       for (const participant of chat.users) {
         io.to(participant.toString()).emit("contacts", updatedChat);
       }
     }
 
     return undefined;
+  } catch (error) {
+    return next(error);
+  }
+};
+
+module.exports.getAttachment = async (req, res, next) => {
+  try {
+    const { filename } = req.params;
+
+    if (!filename || typeof filename !== "string") {
+      return res.status(400).json({ message: "Invalid filename" });
+    }
+
+    const safeFilename = path.basename(filename);
+    if (safeFilename !== filename || safeFilename.includes("..")) {
+      return res.status(400).json({ message: "Invalid filename" });
+    }
+
+    const attachmentsDir = path.resolve(__dirname, "../images/attachments");
+    const filePath = path.join(attachmentsDir, safeFilename);
+
+    // Path traversal check
+    if (!filePath.startsWith(attachmentsDir) || !fs.existsSync(filePath)) {
+      return res.status(404).json({ message: "Attachment not found" });
+    }
+
+    // Verify chat membership
+    const message = await Messages.findOne({ attachment: safeFilename }).populate("chat");
+    if (!message || !message.chat) {
+      return res.status(404).json({ message: "Attachment not found" });
+    }
+
+    const isMember = message.chat.users.some(
+      (userId) => userId.toString() === req.user._id.toString()
+    );
+
+    if (!isMember) {
+      return res.status(403).json({ message: "Not authorized to access this attachment" });
+    }
+
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    return res.sendFile(filePath);
   } catch (error) {
     return next(error);
   }

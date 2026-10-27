@@ -4,15 +4,16 @@
 
 ![Orbit Banner](public/src/assets/logo.svg)
 
-**A secure, feature-rich real-time chat application built on the MERN stack (MongoDB, Express, React, Node.js) with Socket.IO.**
+**A secure real-time chat application built on the MERN stack (MongoDB, Express, React, Node.js) with Socket.IO, featuring email verification, secure email changes, multi-admin group management, authenticated file attachments, and comprehensive authorization controls.**
 
 [![React](https://img.shields.io/badge/React-18.2.0-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-[![Node.js](https://img.shields.io/badge/Node.js-18%20%7C%2020-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
-[![Express](https://img.shields.io/badge/Express-4.18.2-000000?logo=express&logoColor=white)](https://expressjs.com/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose%206.7-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
-[![Socket.IO](https://img.shields.io/badge/Socket.IO-4.5.4-010101?logo=socket.io&logoColor=white)](https://socket.io/)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.16.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-4.21.2-000000?logo=express&logoColor=white)](https://expressjs.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Mongoose%206.13-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![Socket.IO](https://img.shields.io/badge/Socket.IO-4.8.1-010101?logo=socket.io&logoColor=white)](https://socket.io/)
+[![Helmet](https://img.shields.io/badge/Security-Helmet%208.0-FFDA3E?logo=helmet&logoColor=black)](https://helmetjs.github.io/)
 [![SCSS](https://img.shields.io/badge/Styles-SCSS-CC6699?logo=sass&logoColor=white)](https://sass-lang.com/)
-[![Tests](https://img.shields.io/badge/Tests-Jest%20%7C%20RTL-C21325?logo=jest&logoColor=white)](https://jestjs.io/)
+[![Tests](https://img.shields.io/badge/Tests-158%20Passed-C21325?logo=jest&logoColor=white)](https://jestjs.io/)
 
 </div>
 
@@ -27,8 +28,8 @@
 - [Project Directory Structure](#project-directory-structure)
 - [Prerequisites](#prerequisites)
 - [Environment Configuration](#environment-configuration)
-  - [Backend (.env)](#backend-serverenv)
-  - [Frontend (.env)](#frontend-publicenv)
+  - [Backend (`server/.env`)](#backend-serverenv)
+  - [Frontend (`public/.env`)](#frontend-publicenv)
   - [Gmail SMTP Setup Guide](#gmail-smtp-setup-guide)
 - [Installation & Local Setup](#installation--local-setup)
   - [Windows (PowerShell)](#windows-powershell)
@@ -42,16 +43,22 @@
   - [Contact Privacy & Blocking Routes (`/api/blocks`)](#contact-privacy--blocking-routes-apiblocks)
 - [Security & Validation Controls](#security--validation-controls)
 - [Performance & Scalability Considerations](#performance--scalability-considerations)
-- [Future Roadmap](#future-roadmap)
 - [Deployment Guidance](#deployment-guidance)
+- [Future Roadmap](#future-roadmap)
 
 ---
 
 ## Overview
 
-**Orbit** is a full-stack, real-time messaging platform designed for seamless personal and team communication. Built from the ground up on the **MERN** stack, Orbit couples the agility of a React single-page frontend with the robust concurrency of an Express.js and Node.js backend, backed by MongoDB for persistent document storage and Socket.IO for low-latency bidirectional messaging.
+**Orbit** is a full-stack real-time messaging platform designed for personal and team communication. Built on the **MERN** stack, Orbit couples the reactivity of a React single-page frontend with the robust concurrency of an Express.js and Node.js backend, backed by MongoDB for persistent document storage and Socket.IO for low-latency bidirectional messaging.
 
-Orbit prioritizes user security and data integrity. Unlike naive chat implementations where WebSocket clients write directly to the database, Orbit enforces a **strict hybrid architecture**: all data mutations (messages, profile modifications, group management) are authorized and validated through RESTful HTTP endpoints, while Socket.IO handles connection authentication, room presence, and instant event broadcasting.
+Orbit prioritizes user privacy, data security, and operational reliability:
+- **Strict Hybrid Architecture**: All mutations (messages, profile modifications, group management) are authorized and validated through RESTful HTTP endpoints before any Socket.IO events are dispatched.
+- **Private Attachment Access Control**: Uploaded message attachments are never publicly accessible; they require authenticated session tokens and chat membership verification.
+- **Binary Magic Byte Inspection**: Uploaded media undergo binary signature validation to prevent script or executable uploads disguised as images.
+- **Keyed HMAC Verification Codes**: Email verification codes are hashed using HMAC-SHA256 with server-side secrets, protecting against database-dump offline rainbow table attacks.
+- **Secure Email-Change Lifecycle**: Email updates preserve the active verified email until a single-use 6-digit OTP sent to the new address is verified; cancellation immediately clears pending state without locking out the user or breaking session authorization.
+- **Comprehensive Rate Limiting**: Sensitive auth endpoints (registration, login, verify code, resend, email update) are protected by sliding-window rate limiters.
 
 ---
 
@@ -59,19 +66,27 @@ Orbit prioritizes user security and data integrity. Unlike naive chat implementa
 
 ### 🔐 Robust Authentication & Account Security
 - **Email Verification with 6-Digit Codes**: Newly registered accounts must verify their email address using a single-use 6-digit numeric verification code delivered via Nodemailer and Gmail SMTP.
-- **Cryptographic Code Storage**: Verification codes are hashed using SHA-256 before storage in MongoDB; raw codes are never stored in plaintext or logged.
+- **Keyed HMAC Code Storage**: Verification codes are hashed using HMAC-SHA256 keyed with server secrets (`EMAIL_VERIFICATION_SECRET` or `JWT_SECRET`); raw codes are never stored or logged in plain text.
 - **Brute-Force & Expiry Protection**: Verification codes expire automatically after 10 minutes and lock after 5 consecutive failed attempts.
-- **Rate-Limited Resends**: Registration and code resend requests enforce a 60-second cooldown period via custom Express rate limiters.
-- **Unverified Session Gate**: Unverified users are blocked from logging in or establishing authenticated Socket.IO connections.
+- **Sliding-Window Rate Limiting**: Protects registration, login, code verification, resend, and email update endpoints against automated credential stuffing and brute-force attacks.
+- **Secure Email-Change Workflow**:
+  - Requesting an email update validates the address and records it as `pendingEmail` without altering the user's active verified email or session status.
+  - Generates and dispatches a single-use 6-digit OTP to the **new** address.
+  - The existing email remains fully authoritative, active, and verified throughout the pending change.
+  - Dedicated 6-digit OTP verification UI with auto-focus, paste support, and a 60-second cooldown timer.
+  - Only upon successful code verification is `pendingEmail` atomically promoted to the primary `email`.
+  - Explicit cancellation safely clears the pending state and code, preserving the original email and returning the user to Profile Settings without session interruption or login blocking.
+- **Account Deletion Safety**: Deleting an account safely purges direct chats, blocks, and custom avatars while preserving group chats and messages sent by surviving members.
+- **Unverified Session Gate**: Unverified accounts cannot log in or establish authenticated Socket.IO connections.
 - **Secure Password Hashing**: Passwords are encrypted with `bcrypt` (10 salt rounds).
-- **JWT Authorization**: Authenticated API requests and Socket.IO handshakes require a valid JSON Web Token (`Bearer <token>`).
+- **JWT Authorization**: Authenticated API requests and Socket.IO handshakes require a valid JSON Web Token (`Bearer <token>` or `?token=<token>`).
 
 ### 💬 Real-Time Messaging & Presence
 - **One-on-One Direct Conversations**: Fast, private messaging between individual users.
-- **Instant Message Broadcasting**: Messages appear instantly in the chat window of active conversation participants.
-- **Pagination & Infinite Scroll Support**: Conversation histories are queried with cursor/page limits (`limit`, `page`, `before`), returning response headers (`X-Total-Count`, `X-Total-Pages`) and structured pagination payloads.
+- **Instant Message Broadcasting**: Messages appear instantly in the chat window of active conversation participants via Socket.IO rooms.
+- **Pagination & Cursor Support**: Conversation histories are queried with limit, page, and cursor bounds (`limit`, `page`, `before`), returning response headers (`X-Total-Count`, `X-Total-Pages`) and structured pagination payloads.
 - **Typing Indicators**: Visual indicators inform participants when the active peer is composing a message.
-- **Attachment Sharing**: Users can upload and share image attachments (up to 5MB) within messages.
+- **Authenticated Attachment Sharing**: Users can upload and share image attachments within messages. Attachments are served exclusively through an authenticated, membership-verified endpoint (`/api/messages/attachment/:filename`).
 - **Custom Emoji Picker**: Integrated `emoji-picker-react` modal for expressive messaging.
 
 ### 👥 Advanced Group Chat Management
@@ -86,63 +101,29 @@ Orbit prioritizes user security and data integrity. Unlike naive chat implementa
 
 ### ⚡ Live Profile & Username Synchronization
 - **Real-Time Username Updates**: Changing a username immediately broadcasts a `user updated` socket event to all active conversation partners and group members without requiring a page refresh.
-- **Profile Picture Uploads**: Custom profile pictures are handled via Multer disk storage and served via an Express static directory.
+- **Profile Picture Uploads**: Custom profile pictures are handled via Multer disk storage and served via an Express static directory with magic byte validation.
 
 ### 🎨 Theme & Modern Responsive UI
 - **Dual Themes**: Full light-mode and dark-mode support powered by SCSS design tokens and modular mixins.
 - **Responsive Navigation Drawer**: Optimized layout for both desktop widescreen viewports and mobile devices with collapsible navigation drawers.
+- **Accessible 6-Digit OTP Component**: Six dedicated numeric input boxes featuring auto-advancing focus, backspace navigation, clipboard paste support, visible focus rings, and cooldown states.
 
 ---
 
 ## Architecture & Application Flow
 
-Orbit employs a hybrid architecture separating state mutation from real-time event dissemination. 
+Orbit employs a hybrid architecture separating state mutation from real-time event dissemination:
 
-### Why REST for Persistence and Socket.IO for Broadcasting?
-1. **Guaranteed Validation & Authorization**: File uploads (Multer) and complex schema validations (Bcrypt, Mongoose models, block checks) are handled reliably over standard HTTP request-response cycles.
-2. **Reliable Error Handling**: If an attachment is oversized, a user is blocked, or validation fails, the sender immediately receives standard HTTP status codes (e.g., `400 Bad Request`, `403 Forbidden`) with structured JSON errors.
-3. **No Phantom Socket Messages**: Socket.IO is reserved for push notifications. The server only emits `message recieved` and `contacts` events **after** the database transaction has successfully committed.
-
-### Architecture Diagram
-
-```mermaid
-flowchart TD
-    subgraph Client["React Single-Page Application"]
-        UI["React UI (Chat / Contacts / Forms)"]
-        AuthCtx["ChatProvider / Auth Context"]
-        SocketClient["Socket.IO Client (JWT Handshake)"]
-    end
-
-    subgraph Backend["Express & Node.js Server"]
-        Router["Express Router (/api/*)"]
-        AuthMW["authMiddleware (JWT & Verification Check)"]
-        UploadMW["uploadMiddleware (Multer Storage)"]
-        Controllers["Controllers (Messages, Auth, Chats, Blocks)"]
-        SocketServer["Socket.IO Server (Room Management)"]
-    end
-
-    subgraph Persistence["Data & External Services"]
-        MongoDB[("MongoDB Database\n(Users, Chats, Messages, Blocks)")]
-        GmailSMTP["Gmail SMTP / Nodemailer\n(6-Digit Verification Codes)"]
-        DiskStorage["Local Disk / Public Static Assets\n(Profile Pics & Attachments)"]
-    end
-
-    %% Client to Backend HTTP
-    UI -->|"HTTP POST/PUT/GET (Bearer Token)"| Router
-    Router --> AuthMW
-    AuthMW --> UploadMW
-    UploadMW --> Controllers
-
-    %% Controllers to Persistence
-    Controllers -->|"Query / Insert / Update"| MongoDB
-    Controllers -->|"Store Uploaded Files"| DiskStorage
-    Controllers -->|"Dispatch Email"| GmailSMTP
-
-    %% Real-time Socket Path
-    AuthCtx -->|"Connect with JWT"| SocketServer
-    Controllers -->|"On DB Success: emit('message recieved')"| SocketServer
-    SocketServer -->|"io.to(chatId).emit(...)"| SocketClient
-    SocketClient -->|"Update State without Refresh"| UI
+```
+[React SPA Client]
+    │
+    ├── (1) HTTP REST Mutations (JWT Auth + Validation)
+    │       ▼
+    │   [Express Backend] ── (2) Persist ──> [MongoDB Database]
+    │       │
+    │       └── (3) If Authorized & Persisted ──> [Socket.IO Server]
+    │                                                     │
+    └── (4) Real-Time Events (Broadcast to Room) ◄────────┘
 ```
 
 ---
@@ -153,18 +134,19 @@ flowchart TD
 | :--- | :--- | :--- | :--- |
 | **Frontend Core** | [React](https://react.dev/) | `^18.2.0` | Declarative component UI library |
 | **Routing** | [React Router DOM](https://reactrouter.com/) | `^6.4.3` | Client-side routing, route guards & redirects |
-| **HTTP Client** | [Axios](https://axios-http.com/) | `^1.2.0` | Promise-based HTTP client for API consumption |
-| **Real-Time Client** | [Socket.IO Client](https://socket.io/) | `^4.5.4` | WebSocket / long-polling client event bus |
+| **HTTP Client** | [Axios](https://axios-http.com/) | `^1.7.9` | Promise-based HTTP client for API consumption |
+| **Real-Time Client** | [Socket.IO Client](https://socket.io/) | `^4.8.1` | WebSocket / polling client event bus |
 | **Styling** | [Sass (SCSS)](https://sass-lang.com/) | `^1.58.3` | Modular SCSS stylesheets, variables, and themes |
 | **Icons & Emojis** | [React Icons](https://react-icons.github.io/react-icons/) / [Emoji Picker](https://www.npmjs.com/package/emoji-picker-react) | `^4.7.1` / `^3.5.1` | UI glyphs and conversational emoji keyboard |
-| **Backend Runtime**| [Node.js](https://nodejs.org/) | `>=18.x` | JavaScript runtime environment |
-| **Web Framework** | [Express](https://expressjs.com/) | `^4.18.2` | HTTP REST API server framework |
-| **Database ODM** | [Mongoose](https://mongoosejs.com/) | `^6.7.3` | Object Data Modeling for MongoDB schemas |
-| **Real-Time Server**| [Socket.IO](https://socket.io/) | `^4.5.4` | WebSocket event broadcaster and room router |
+| **Backend Runtime**| [Node.js](https://nodejs.org/) | `>=18.16.0` | JavaScript runtime environment |
+| **Web Framework** | [Express](https://expressjs.com/) | `^4.21.2` | HTTP REST API server framework |
+| **Database ODM** | [Mongoose](https://mongoosejs.com/) | `^6.13.9` | Object Data Modeling for MongoDB schemas |
+| **Real-Time Server**| [Socket.IO](https://socket.io/) | `^4.8.1` | WebSocket event broadcaster and room router |
+| **Security Headers**| [Helmet](https://helmetjs.github.io/) | `^8.0.0` | HTTP security headers (nosniff, HSTS, CORP) |
 | **Security / Auth** | [JSONWebToken](https://github.com/auth0/node-jsonwebtoken) / [Bcrypt](https://www.npmjs.com/package/bcrypt) | `^9.0.0` / `^5.1.0` | Stateless session signing and password hashing |
-| **File Handling** | [Multer](https://github.com/expressjs/multer) | `^1.4.5-lts.1` | Multipart form-data parser for image uploads |
-| **Email Transport** | [Nodemailer](https://nodemailer.com/) | `^10.2.1` | SMTP transport client for Gmail transactional mail |
-| **Testing** | [Jest](https://jestjs.io/) / [Supertest](https://github.com/ladjs/supertest) / [RTL](https://testing-library.com/) | Modern | Unit, integration, and UI component test suites |
+| **File Handling** | [Multer](https://github.com/expressjs/multer) | `^2.5.0` | Secure multipart form-data parser with magic byte validation |
+| **Email Transport** | [Nodemailer](https://nodemailer.com/) | `^6.10.1` | SMTP transport client for Gmail transactional mail |
+| **Testing** | [Jest](https://jestjs.io/) / [Supertest](https://github.com/ladjs/supertest) / [RTL](https://testing-library.com/) | Modern | Unit, integration, and UI component test suites (158 passing tests: 103 backend, 55 frontend) |
 
 ---
 
@@ -174,10 +156,12 @@ flowchart TD
 chat-app-mern-master/
 ├── .env.example                 # Root environment variable template
 ├── .gitignore                   # Git exclusion patterns (secrets, logs, modules)
+├── LICENSE                      # Standalone project license
 ├── README.md                    # Project documentation and architectural guide
 ├── package.json                 # Root package configuration
 ├── public/                      # Frontend React Application
-│   ├── .env                     # Client environment configuration
+│   ├── .env                     # Client environment configuration (local dev)
+│   ├── .env.example             # Frontend environment template with production notes
 │   ├── package.json             # Frontend dependencies and test scripts
 │   ├── src/
 │   │   ├── index.js             # React DOM root entry point
@@ -199,27 +183,27 @@ chat-app-mern-master/
 │   │   │   └── Group/           # Group creation and group settings modals
 │   │   ├── config/              # Helper utilities (ChatLogics, sender formatting)
 │   │   ├── context/             # Global React Context (ChatProvider, state)
-│   │   ├── pages/               # Top-level view routes (Chat, Auth, VerifyEmail)
+│   │   ├── pages/               # Top-level view routes (Chat, Authorization, VerifyEmail)
 │   │   ├── scss/                # Modular SCSS styling, mixins, and theme palettes
 │   │   └── utils/               # Axios route maps, constants, and broadcast helpers
 │
 └── server/                      # Backend Express & Socket.IO Application
     ├── .env                     # Backend environment file (Git ignored)
     ├── .env.example             # Backend environment template with instructions
-    ├── app.js                   # Express application setup, routes, and middleware
-    ├── index.js                 # Server entry point, DNS resolver, and DB connection
-    ├── package.json             # Backend dependencies and test scripts
+    ├── app.js                   # Express setup, security headers, CORS, and error handlers
+    ├── index.js                 # Server entry point, DNS config, and DB connection
+    ├── package.json             # Backend dependencies, engines, and test scripts
     ├── socket.js                # Socket.IO authorization, rooms, and event routing
     ├── config/                  # JWT token generator utilities
     ├── controller/              # Request handlers (auth, chats, messages, blocks)
     ├── images/                  # Local storage directories for uploaded media
-    │   ├── attachments/         # Message attachment storage
-    │   └── profile_pictures/    # User profile pictures
-    ├── middleware/              # Auth verification, rate limiting, and Multer upload
+    │   ├── attachments/         # Message attachment storage (private, authenticated)
+    │   └── profile_pictures/    # User profile pictures (public static)
+    ├── middleware/              # Auth verification, rate limiting, and upload validation
     ├── model/                   # Mongoose schemas (User, Chat, Message, Block)
     ├── routes/                  # Express REST route definitions
     ├── tests/                   # Backend Jest and Supertest test suites
-    └── utils/                   # Nodemailer email service and group admin helpers
+    └── utils/                   # Nodemailer email service, DNS config, and group admin helpers
 ```
 
 ---
@@ -242,9 +226,6 @@ Before setting up Orbit locally, ensure your development environment satisfies:
 4. **Google Account (for Email Verification)**:
    - A personal Gmail account with **2-Step Verification enabled** to generate a 16-character **App Password**.
 
-> [!NOTE]
-> **Windows DNS Resolution on MongoDB Atlas**: `server/index.js` explicitly configures public DNS resolvers (`8.8.8.8` and `1.1.1.1`) via `dns.setServers()`. This prevents Windows Node.js runtimes from failing on `mongodb+srv://` SRV record queries.
-
 ---
 
 ## Environment Configuration
@@ -254,42 +235,61 @@ Before setting up Orbit locally, ensure your development environment satisfies:
 Create a `.env` file in the `server/` directory (you can copy `server/.env.example`):
 
 ```env
-# Server Port
+# Required: Server Port (defaults to 5000 if omitted)
 PORT=5000
+NODE_ENV=development
 
-# MongoDB Connection String (Local or Atlas)
+# Required: MongoDB Connection String (Local or Atlas)
 MONGODB_URL=mongodb+srv://<username>:<password>@cluster0.mongodb.net/orbit?retryWrites=true&w=majority
 
-# JWT Signing Secret (Minimum 32 random characters)
+# Required: JWT Signing Secret (Minimum 32 characters recommended)
 JWT_SECRET=your_super_secret_jwt_key_at_least_32_chars_long
 
-# Frontend URL (Used for CORS and verification redirection)
+# Optional: Dedicated Verification Secret for HMAC code hashing (defaults to JWT_SECRET if unset)
+EMAIL_VERIFICATION_SECRET=your_email_verification_secret_here
+
+# Required: Frontend URL(s) (comma-separated if multiple origins, used for CORS and email links)
 CLIENT_URL=http://localhost:3000
 
-# Gmail SMTP Configuration for 6-Digit Email Verification
+# Optional: Reverse Proxy Configuration (set to "true" when behind Nginx, Render, Heroku, Cloudflare, etc.)
+TRUST_PROXY=false
+
+# Optional: DNS Override configuration for environments where SRV lookups fail (e.g. Windows Node.js)
+# ENABLE_DNS_OVERRIDE=true
+# DNS_SERVERS=8.8.8.8,1.1.1.1
+
+# Required: Gmail SMTP Configuration for 6-Digit Email Verification
 GMAIL_USER=your_personal_email@gmail.com
 GMAIL_APP_PASSWORD=abcdefghijklmnop
 GMAIL_SENDER_NAME="Orbit"
 ```
 
+> **DNS SRV Resolution Note**: Certain Node.js versions on Windows or restricted local networks fail to resolve MongoDB Atlas SRV records (`_mongodb._tcp...`) with `querySrv ECONNREFUSED`. In such cases, setting `ENABLE_DNS_OVERRIDE=true` and `DNS_SERVERS=8.8.8.8,1.1.1.1` configures Node's DNS resolver via `node:dns` before establishing the database connection.
+
 ### Frontend (`public/.env`)
 
-Create or review the `.env` file in the `public/` directory:
+Create or review the `.env` file in the `public/` directory (you can copy `public/.env.example`):
 
 ```env
-# LocalStorage Key for Session Persistence
+# Required: LocalStorage Key for Session Persistence
 REACT_APP_LOCALHOST_KEY="chat-app-user"
 
-# URL Endpoints for Serving Static Uploaded Media
-REACT_APP_PROFILE_PICS_PATHS="http://localhost:5000/images/profile_pictures/"
-REACT_APP_ATTACHMENT_PATHS="http://localhost:5000/images/attachments/"
+# Optional: Backend API and Socket URLs (defaults to http://localhost:5000 in local dev)
+REACT_APP_API_URL=http://localhost:5000
+REACT_APP_SOCKET_URL=http://localhost:5000
+
+# Optional: Base URL for Profile Pictures (defaults to ${REACT_APP_API_URL}/images/profile_pictures/)
+# REACT_APP_PROFILE_PICS_PATHS="http://localhost:5000/images/profile_pictures/"
+
+# Optional: Custom Media Path for Attachments (defaults to authenticated backend route)
+# REACT_APP_ATTACHMENT_PATHS="http://localhost:5000/api/messages/attachment/"
 ```
 
 ### Gmail SMTP Setup Guide
 
-To enable email verification code delivery:
+To enable email verification and email-change OTP delivery:
 1. Navigate to your [Google Account Security Settings](https://myaccount.google.com/security).
-2. Enable **2-Step Verification** if not already enabled.
+2. Enable **2-Step Verification** if not already active.
 3. Open [Google App Passwords](https://myaccount.google.com/apppasswords).
 4. Enter an application name (e.g. `Orbit Chat`) and click **Create**.
 5. Copy the generated 16-character password and assign it to `GMAIL_APP_PASSWORD` in `server/.env` without spaces.
@@ -312,18 +312,19 @@ npm install
 
 # 3. Create and configure server environment file
 Copy-Item -Path .env.example -Destination .env
-# Open server/.env in your editor and enter your MONGO_URL, JWT_SECRET, and GMAIL credentials
+# Open server/.env and fill in your MONGODB_URL, JWT_SECRET, and GMAIL credentials
 
 # 4. Install frontend dependencies
 Set-Location -Path ../public
 npm install
+Copy-Item -Path .env.example -Destination .env
 
-# 5. Start the backend server (in a separate terminal)
-# From the server directory:
-npm start
+# 5. Start the backend server (Terminal 1)
+# From server directory:
+npm run dev   # or: npm start
 
-# 6. Start the frontend React development server (in another terminal)
-# From the public directory:
+# 6. Start the frontend React development server (Terminal 2)
+# From public directory:
 npm start
 ```
 
@@ -345,27 +346,23 @@ cp .env.example .env
 # 4. Install frontend dependencies
 cd ../public
 npm install
+cp .env.example .env
 
 # 5. Start the backend server (Terminal 1)
-npm start
+cd ../server
+npm run dev   # or: npm start
 
 # 6. Start the frontend server (Terminal 2)
 cd ../public
 npm start
 ```
 
-Once both servers are running:
-- Open your browser to **`http://localhost:3000`**.
-- Register a new account.
-- Check your email inbox for the 6-digit verification code.
-- Enter the code on the Orbit verification screen to activate your account and begin chatting.
-
 ---
 
 ## Running Tests & Production Build
 
 ### Backend Tests
-The server test suite uses **Jest** and **Supertest** to execute comprehensive integration tests covering authentication, rate limiting, verification codes, permissions, contact blocking, message pagination, file uploads, and Socket.IO authorization.
+The server test suite uses **Jest** and **Supertest** to execute 103 integration tests across 7 test suites covering authentication, rate limiting, HMAC verification codes, email changes, permissions, contact blocking, message pagination, magic byte file validation, DNS fallbacks, and Socket.IO authorization:
 
 ```bash
 cd server
@@ -373,49 +370,46 @@ npm test
 ```
 
 ### Frontend Tests
-The frontend suite uses **React Testing Library** and **Jest** to test UI components, route protection, email verification flows, and chat logic calculations:
+The frontend suite uses **React Testing Library** and **Jest** to test UI components, route protection, email verification flows, 6-digit OTP input interactions, profile updates, and chat logic calculations (55 tests across 9 test suites):
 
 ```bash
 cd public
 npm test -- --watchAll=false
 ```
 
-### Frontend Production Build
-To create an optimized, minified production build of the React client:
+### Production Build
+To create an optimized production build of the React frontend:
 
 ```bash
 cd public
 npm run build
 ```
-The compiled output will be generated in `public/build/`.
+This produces optimized, gzipped static assets in `public/build/`.
 
 ---
 
 ## Message Lifecycle & Real-Time Data Flow
 
-Understanding how a message travels through Orbit:
-
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Alice as Sender (Alice)
-    participant UI as Orbit React Client
+    actor Alice as Alice (Sender)
+    participant UI as React Client
     participant API as Express API (/api/messages/addmsg)
-    participant DB as MongoDB Database
+    participant DB as MongoDB
     participant Socket as Socket.IO Server
-    actor Bob as Recipient (Bob)
+    actor Bob as Bob (Recipient)
 
-    Alice->>UI: Enters message & hits Send (or attaches image)
-    UI->>API: HTTP PUT /api/messages/addmsg (Bearer JWT, ChatId, Content / File)
-    API->>API: authMiddleware verifies JWT & emailVerified status
-    API->>API: uploadMiddleware parses attachment (if present)
-    API->>DB: Query Block collection (Ensure neither user has blocked the other)
-    alt Is Blocked
-        API-->>UI: 403 Forbidden ({ msg: "DIRECT_MESSAGE_BLOCKED" })
+    Alice->>UI: Types message & clicks Send (or attaches image)
+    UI->>API: PUT /api/messages/addmsg (Authorization: Bearer Token)
+    Note over API: Authenticates JWT & checks chat membership
+    Note over API: Validates file magic bytes if attachment present
+    alt Is Direct Chat & Block Exists
+        API-->>UI: 403 Forbidden (DIRECT_MESSAGE_BLOCKED)
         UI-->>Alice: Render blocking error banner
     else Is Permitted
         API->>DB: Insert Message document & update Chat.latestMessage
-        DB-->>API: Saved message populated with sender & chat metadata
+        DB-->>API: Saved message populated with sender & chat metadata (email omitted)
         API-->>UI: 201 Created (Returns saved message JSON)
         UI-->>Alice: Append message to chat window & play UI feedback
         API->>Socket: Retrieve io instance from app.get("io")
@@ -433,22 +427,29 @@ All protected endpoints require the HTTP header:
 ```http
 Authorization: Bearer <your_jwt_token>
 ```
+Or for media attachments:
+```http
+GET /api/messages/attachment/:filename?token=<your_jwt_token>
+```
 
 ### Authentication Routes (`/api/auth`)
 
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/register` | Public | Register new user. Accepts `multipart/form-data` with optional `profilePic`. Dispatches 6-digit verification code. |
-| `POST` | `/api/auth/login` | Public | Authenticate user credentials. Rejects unverified accounts with HTTP 403. Returns JWT token. |
+| `POST` | `/api/auth/register` | Public (Rate-Limited) | Register new user. Accepts `multipart/form-data` with optional `profilePic`. Validates magic bytes. Dispatches 6-digit verification code. |
+| `POST` | `/api/auth/login` | Public (Rate-Limited) | Authenticate user credentials. Rejects unverified accounts with HTTP 403. Returns JWT token. |
 | `GET` | `/api/auth/me` | Protected | Returns profile data for the authenticated session user. |
-| `POST` | `/api/auth/verify-code` | Public | Verify account using submitted 6-digit numeric code. Clears token hash on success. |
-| `POST` | `/api/auth/resend-verification` | Public | Resend fresh 6-digit code. Subject to 60s cooldown rate limiter. |
+| `POST` | `/api/auth/verify-code` | Public (Rate-Limited) | Verify newly registered account using submitted 6-digit numeric code. Atomically marks verified. |
+| `POST` | `/api/auth/resend-verification` | Public (Rate-Limited) | Resend fresh 6-digit code for unverified accounts. Subject to 60s cooldown rate limiter. |
 | `GET` | `/api/auth/allUsers` | Protected | Fetch directory of all users with mutual block status flags for search. |
 | `PUT` | `/api/auth/renameUser` | Protected | Update username. Broadcasts real-time `user updated` socket event. |
-| `PUT` | `/api/auth/emailUpdate` | Protected | Update user email address. |
+| `PUT` | `/api/auth/emailUpdate` | Protected (Rate-Limited) | Request email address update. Validates new email, stores `pendingEmail`, and sends 6-digit OTP to new address without altering active email. |
+| `POST` | `/api/auth/verify-email-update` | Protected (Rate-Limited) | Verify 6-digit OTP for pending email change. On success, atomically promotes `pendingEmail` to active email and clears pending fields. |
+| `POST` | `/api/auth/resend-email-update` | Protected (Rate-Limited) | Resend fresh 6-digit OTP to `pendingEmail`. Subject to 60s cooldown rate limiter. |
+| `POST` | `/api/auth/cancel-email-update` | Protected | Cancel pending email change, invalidating outstanding OTP and restoring original profile state. |
 | `PUT` | `/api/auth/passwordUpdate` | Protected | Update user password after validating existing password. |
-| `PUT` | `/api/auth/profilePicUpdate` | Protected | Upload new profile image (`multipart/form-data`). |
-| `PUT` | `/api/auth/deleteUser` | Protected | Permanently delete user profile and associated data. |
+| `PUT` | `/api/auth/profilePicUpdate` | Protected | Upload new profile image (`multipart/form-data`) with magic byte validation. |
+| `PUT` | `/api/auth/deleteUser` | Protected | Permanently delete user profile, direct chats, and avatar while preserving group chat messages. |
 
 ### Chat Management Routes (`/api/chats`)
 
@@ -469,8 +470,9 @@ Authorization: Bearer <your_jwt_token>
 
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
-| `PUT` | `/api/messages/addmsg` | Protected | Persist and send a message. Accepts text `message` and optional `attachment` file. Checks block status and emits Socket.IO event. |
+| `PUT` | `/api/messages/addmsg` | Protected | Persist and send a message. Accepts text `content` and optional `attachment` file. Checks block status and emits Socket.IO event. |
 | `GET` | `/api/messages/getmsg/:chatId` | Protected | Fetch paginated chat messages. Supports query params: `limit` (default 50), `page` (default 1), `before` (ISO date cursor), and `paginated=true`. |
+| `GET` | `/api/messages/attachment/:filename` | Protected | Retrieve private message attachment file. Verifies chat membership and path traversal. |
 
 ### Contact Privacy & Blocking Routes (`/api/blocks`)
 
@@ -484,14 +486,33 @@ Authorization: Bearer <your_jwt_token>
 
 ## Security & Validation Controls
 
-Orbit implements defense-in-depth across the entire application lifecycle:
+Orbit implements defense-in-depth across the entire application stack:
 
-1. **Cryptographic Token Hashing**: Verification codes are processed through `crypto.createHash("sha256")` before persistence. Even in the event of an unauthorized database dump, raw verification codes remain uncompromised.
-2. **Strict Socket Handshake Authentication**: Socket.IO connections execute a JWT verification middleware upon connection. Unverified or expired tokens are rejected immediately.
-3. **Guarded Room Join Logic**: When a client requests `socket.emit("join chat", roomId)`, the server verifies that `socket.user._id` exists in the `chat.users` membership array. Unauthorized clients cannot eavesdrop on rooms.
-4. **No Direct Socket Ingestion**: The server explicitly intercepts `socket.on("new message")` and emits an error instructing the client to use the authenticated REST endpoint, preventing spoofed message creation.
-5. **NoSQL Injection Defense**: User queries use regex sanitization (`escapeRegex`) and explicit ObjectId schema casting.
-6. **Upload Constraints**: Multer configurations restrict file uploads to standard image MIME types (`jpeg`, `png`, `webp`) and enforce a strict 5MB file size limit.
+1. **Private Attachment Protection**:
+   Unlike profile pictures (which are public avatars), message attachments are **never served statically**. All attachment requests pass through `GET /api/messages/attachment/:filename`, which validates the user's JWT and verifies that the user is an active participant of the chat containing the attachment. Path traversal attempts (`..`) are strictly rejected.
+2. **Binary Magic Byte Inspection**:
+   File uploads are not trusted solely by extension or client-reported MIME type. Upload middleware validates the initial binary magic bytes on disk:
+   - JPEG: `FF D8 FF`
+   - PNG: `89 50 4E 47`
+   - GIF: `47 49 46 38`
+   - WEBP: `RIFF` ... `WEBP`
+   Disguised scripts or executable files are immediately unlinked and rejected with HTTP 400.
+3. **Keyed HMAC Verification Codes**:
+   6-digit verification codes are hashed using `crypto.createHmac("sha256", secret)` before storage in MongoDB. Even if the database is compromised, active codes cannot be rainbow-tabled or brute-forced offline without the server-side HMAC secret.
+4. **Rate Limiting on Sensitive Auth Endpoints**:
+   Custom sliding-window rate limiters protect registration (10 req/15min), login (15 req/15min), code verification (10 req/15min), and code resends (3 req/5min with 60s cooldown).
+5. **Security Headers with Helmet**:
+   Express integrates `helmet()` to enforce `X-Content-Type-Options: nosniff`, HSTS, X-Frame-Options (`DENY`), and DNS prefetch controls, with cross-origin resource policy configured for avatar embedding.
+6. **Data Privacy**:
+   Message sender population explicitly excludes the `email` field (`populate("sender", "username profilePic")`), preventing participant email addresses from leaking in message histories or Socket.IO payloads.
+7. **Strict Socket Handshake Authentication**:
+   Socket.IO connections execute a JWT verification middleware upon connection. Unverified or expired tokens are rejected immediately.
+8. **Guarded Room Join Logic**:
+   When a client requests `socket.emit("join chat", roomId)`, the server verifies that `socket.user._id` exists in the `chat.users` membership array. Unauthorized clients cannot eavesdrop on rooms.
+9. **No Direct Socket Ingestion**:
+   The server intercepts `socket.on("new message")` and emits an error instructing the client to use the authenticated REST endpoint, preventing spoofed message creation.
+10. **JSON Body Limits**:
+    Body parser size is constrained to `1mb` to prevent large payload Denial of Service attacks.
 
 ---
 
@@ -502,9 +523,72 @@ Orbit implements defense-in-depth across the entire application lifecycle:
   - `Message.chat` & `Message.createdAt`: Compound indexing ensures fast reverse-chronological message lookups.
   - `Block.blocker` & `Block.blockedUser`: Compound unique index for $O(1)$ relationship checks.
 - **Message Pagination**: Rather than loading thousands of messages into memory, Orbit leverages limit/page querying and cursor slicing (`before`), optimizing frontend rendering and minimizing server payload sizes.
-- **Single-Instance to Cluster Scalability**:
-  - Orbit currently runs Socket.IO on a single Node.js instance.
-  - **Horizontal Scale-Out**: For multi-instance deployments behind a load balancer (e.g., NGINX, AWS ALB), integrate the [`@socket.io/redis-adapter`](https://socket.io/docs/v4/redis-adapter/) to route events across separate server nodes.
+- **Horizontal Scale-Out**: For multi-instance deployments behind a load balancer (e.g., NGINX, AWS ALB), integrate the [`@socket.io/redis-adapter`](https://socket.io/docs/v4/redis-adapter/) to route events across separate server nodes.
+
+---
+
+## Deployment Guidance
+
+Orbit is architected as a two-tier system: an Express.js & Socket.IO backend coupled with a separately hosted React single-page frontend and a MongoDB Atlas database.
+
+### Intended Architecture
+
+```
+[React SPA] (Vercel / Netlify / Cloudflare Pages / S3)
+    │
+    ├── HTTPS REST API calls & WSS Socket.IO connections
+    ▼
+[Node.js / Express API] (Render / Railway / Fly.io / AWS EC2)
+    │
+    ├── TLS Connection (SRV Lookup)
+    ▼
+[MongoDB Atlas Database]
+```
+
+### 1. Backend Deployment
+
+- **Hosting Options**: Render, Railway, Fly.io, AWS EC2, or Heroku.
+- **Root Directory**: `server`
+- **Build Command**: `npm install`
+- **Start Command**: `node index.js`
+- **Required Environment Variables**:
+  - `NODE_ENV=production`
+  - `PORT=5000` (or provided by host)
+  - `MONGODB_URL=mongodb+srv://...`
+  - `JWT_SECRET=<strong_random_secret_at_least_32_chars>`
+  - `CLIENT_URL=https://your-frontend-domain.com` (matches frontend origin for CORS)
+  - `GMAIL_USER=your_personal_email@gmail.com`
+  - `GMAIL_APP_PASSWORD=your_16_char_app_password`
+- **Optional Environment Variables**:
+  - `EMAIL_VERIFICATION_SECRET=<strong_random_secret>` (recommended for dedicated HMAC code hashing)
+  - `TRUST_PROXY=true` (must be set when deployed behind a reverse proxy or load balancer so client IP rate limiters function correctly)
+  - `ENABLE_DNS_OVERRIDE=true` and `DNS_SERVERS=8.8.8.8,1.1.1.1` (only if the hosting environment's resolver cannot resolve Atlas SRV records)
+  - `GMAIL_SENDER_NAME="Orbit"`
+- **Persistent File Storage Considerations**:
+  - Orbit's Multer upload middleware stores files on local disk under `server/images/profile_pictures` and `server/images/attachments`.
+  - On platforms with ephemeral container filesystems (e.g. standard Render web services or Heroku dynos), redeploying or restarting containers clears locally stored uploads.
+  - To preserve uploads in production, mount a **persistent disk volume** to `server/images/` or migrate storage handlers to an S3-compatible cloud object store (AWS S3, Cloudflare R2, Google Cloud Storage).
+
+### 2. Frontend Deployment
+
+- **Hosting Options**: Vercel, Netlify, Cloudflare Pages, or AWS S3 + CloudFront.
+- **Root Directory**: `public`
+- **Build Command**: `npm run build`
+- **Output Directory**: `build`
+- **Required Environment Variables**:
+  - `REACT_APP_API_URL=https://your-backend-api.onrender.com`
+  - `REACT_APP_SOCKET_URL=https://your-backend-api.onrender.com`
+  - `REACT_APP_LOCALHOST_KEY="chat-app-user"`
+- **Single Page Application Routing**:
+  Ensure hosting rewrites redirect all non-file route requests to `/index.html` (e.g., via `vercel.json` or `_redirects` for Netlify) so client-side React routes (`/chat`, `/verify-email`) resolve properly on browser refresh.
+
+### 3. Production Readiness Considerations
+
+While Orbit includes extensive security hardening and passes all automated test suites, taking any real-time application to full production scale requires infrastructure planning:
+- Provisioning persistent disk storage or S3 storage for user media.
+- Adding the Redis adapter for multi-instance Socket.IO clustering.
+- Setting up application monitoring, logging, and error tracing (e.g., Sentry, Datadog).
+- Restricting MongoDB Atlas network access to your backend server's static outbound IP addresses.
 
 ---
 
@@ -516,19 +600,3 @@ Orbit implements defense-in-depth across the entire application lifecycle:
 - [ ] **Message Reactions & Threaded Replies**: In-line emoji reactions and nested sub-threads for group discussions.
 - [ ] **Web Push Notifications**: Service Worker integration for browser push notifications when offline.
 - [ ] **Redis Pub/Sub Socket Adapter**: Multi-node horizontal scaling for Socket.IO.
-
----
-
-## Deployment Guidance
-
-### Frontend (Vercel / Netlify / Render)
-1. Set the root build directory to `public`.
-2. Configure build command: `npm run build`.
-3. Set output directory: `build`.
-4. Configure environment variables (`REACT_APP_PROFILE_PICS_PATHS`, `REACT_APP_ATTACHMENT_PATHS`).
-
-### Backend (Render / Railway / Fly.io / AWS EC2)
-1. Set root directory to `server`.
-2. Configure start command: `node index.js`.
-3. Ensure environment variables (`PORT`, `MONGODB_URL`, `JWT_SECRET`, `CLIENT_URL`, `GMAIL_USER`, `GMAIL_APP_PASSWORD`) are configured in your hosting dashboard.
-4. For persistent file uploads in multi-instance containers, mount a persistent volume to `server/images/` or migrate to S3.

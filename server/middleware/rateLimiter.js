@@ -1,6 +1,6 @@
 /**
  * In-memory sliding-window rate limiter for sensitive authentication endpoints
- * (registration and resend verification) to protect against abuse and spam.
+ * (registration, login, verify code, and resend verification) to protect against brute-force attacks and abuse.
  */
 
 const hitRecords = new Map();
@@ -17,7 +17,7 @@ function createRateLimiter({
   windowMs = 15 * 60 * 1000,
   max = 10,
   message = "Too many requests. Please try again later.",
-  keyGenerator = (req) => req.ip || req.connection.remoteAddress || "unknown",
+  keyGenerator = (req) => req.ip || req.connection?.remoteAddress || "unknown",
 }) {
   return (req, res, next) => {
     // Skip rate-limiting in test mode unless specifically enabled
@@ -59,6 +59,30 @@ const registerRateLimiter = createRateLimiter({
   message: "Too many registration attempts from this address. Please try again later.",
 });
 
+// 15 login attempts per IP/account per 15 minutes
+const loginRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  message: "Too many login attempts. Please try again after 15 minutes.",
+  keyGenerator: (req) => {
+    const ip = req.ip || req.connection?.remoteAddress || "ip";
+    const username = (req.body?.username || "").trim().toLowerCase();
+    return `${ip}:${username}`;
+  },
+});
+
+// 10 verification attempts per IP/target per 15 minutes
+const verifyCodeRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: "Too many verification attempts. Please try again later.",
+  keyGenerator: (req) => {
+    const ip = req.ip || req.connection?.remoteAddress || "ip";
+    const email = (req.body?.email || req.query?.email || "").trim().toLowerCase();
+    return `${ip}:${email}`;
+  },
+});
+
 // 3 resend attempts per IP/target per 5 minutes
 const resendRateLimiter = createRateLimiter({
   windowMs: 5 * 60 * 1000,
@@ -74,6 +98,8 @@ const resendRateLimiter = createRateLimiter({
 module.exports = {
   createRateLimiter,
   registerRateLimiter,
+  loginRateLimiter,
+  verifyCodeRateLimiter,
   resendRateLimiter,
   clearRateLimitRecords,
 };

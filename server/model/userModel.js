@@ -49,9 +49,31 @@ const userSchema = new mongoose.Schema(
         emailVerificationLastSent: {
             type: Date,
         },
+        pendingEmail: {
+            type: String,
+            max: 50,
+            trim: true,
+            lowercase: true,
+        },
+        pendingEmailVerificationTokenHash: {
+            type: String,
+            select: false,
+        },
+        pendingEmailVerificationExpires: {
+            type: Date,
+        },
+        pendingEmailVerificationAttempts: {
+            type: Number,
+            default: 0,
+            select: false,
+        },
+        pendingEmailVerificationLastSent: {
+            type: Date,
+        },
     }
 );
 
 userSchema.index({ emailVerificationTokenHash: 1 }, { sparse: true });
+userSchema.index({ pendingEmailVerificationTokenHash: 1 }, { sparse: true });
 
 module.exports = mongoose.model("User", userSchema);

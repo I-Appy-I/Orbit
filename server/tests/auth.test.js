@@ -57,7 +57,8 @@ describe("Authentication & Email Verification System", () => {
     expect(sent[0]._code).toMatch(/^\d{6}$/);
 
     // Verify stored hash matches hash of 6-digit code in email
-    const computedHash = crypto.createHash("sha256").update(sent[0]._code).digest("hex");
+    const secret = process.env.EMAIL_VERIFICATION_SECRET || process.env.JWT_SECRET || "orbit-default-verification-secret";
+    const computedHash = crypto.createHmac("sha256", secret).update(sent[0]._code).digest("hex");
     expect(dbUser.emailVerificationTokenHash).toBe(computedHash);
 
     // Check expiration is 10 minutes
@@ -564,4 +565,53 @@ describe("Authentication & Email Verification System", () => {
       expect(sanitized).toContain("password=[REDACTED]");
     });
   });
+
+  it("should verify successfully with legacy SHA-256 code hash in database for backward compatibility", async () => {
+    const rawCode = "123456";
+    const legacyHash = crypto.createHash("sha256").update(rawCode).digest("hex");
+    await User.create({
+      username: "legacyuser",
+      email: "legacy@example.com",
+      password: "password123",
+      emailVerified: false,
+      emailVerificationTokenHash: legacyHash,
+      emailVerificationExpires: new Date(Date.now() + 10 * 60 * 1000),
+    });
+
+    const res = await request(app)
+      .post("/api/auth/verify-code")
+      .send({ email: "legacy@example.com", code: rawCode });
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe(true);
+    const dbUser = await User.findOne({ email: "legacy@example.com" });
+    expect(dbUser.emailVerified).toBe(true);
+  });
+
+  it("should rate limit excessive login attempts when test rate limiting is enabled", async () => {
+    process.env.ENABLE_TEST_RATE_LIMIT = "true";
+    const { clearRateLimitRecords } = require("../middleware/rateLimiter");
+    clearRateLimitRecords();
+
+    try {
+      // 15 attempts allowed
+      for (let i = 0; i < 15; i++) {
+        await request(app)
+          .post("/api/auth/login")
+          .send({ username: "rateuser", password: "wrongpassword" });
+      }
+
+      // 16th attempt should be blocked with 429
+      const res = await request(app)
+        .post("/api/auth/login")
+        .send({ username: "rateuser", password: "wrongpassword" });
+
+      expect(res.status).toBe(429);
+      expect(res.body.msg).toMatch(/Too many login attempts/);
+    } finally {
+      delete process.env.ENABLE_TEST_RATE_LIMIT;
+      clearRateLimitRecords();
+    }
+  });
+
 });

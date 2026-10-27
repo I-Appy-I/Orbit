@@ -11,6 +11,8 @@ if (typeof jest !== "undefined") {
 }
 
 const mongoose = require("mongoose");
+mongoose.set("strictQuery", true);
+
 const { MongoMemoryServer } = require("mongodb-memory-server");
 
 let mongoServer;
