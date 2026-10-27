@@ -4,6 +4,7 @@
 
   .modal-container {
     max-width: 480px;
+    width: 100%;
 
     .modal-content {
       display: flex;
@@ -95,7 +96,7 @@
   .group-field { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); }
   .group-field input { height: 42px; padding: 0 0.75rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font: inherit; }
   .selected-summary { font-size: 0.85rem; color: var(--text-secondary); }
-  .group-user-list { max-height: 230px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+  .group-user-list { max-height: min(230px, 30vh); overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
   .group-user { display: flex; align-items: center; gap: 0.65rem; padding: 0.55rem 0.75rem; cursor: pointer; border-bottom: 1px solid var(--border); }
   .group-user:last-child { border-bottom: 0; }
   .group-user.selected { background: var(--bg-active); }

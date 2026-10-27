@@ -343,7 +343,7 @@ function Chat() {
     <>
       <div className="chat-container">
         {user && (
-          <div className={`container chat-box ${selectedChat ? "has-selected-chat" : ""}`}>
+          <div className={`container chat-box ${selectedChat ? "has-selected-chat" : ""} ${profileSettingsOpen ? "has-profile-open" : ""}`}>
             <aside className="aside" aria-label="Conversation list">
               <header className="sidebar-header">
                 {navState === "add-trip" ? (

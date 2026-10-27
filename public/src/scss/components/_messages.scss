@@ -10,6 +10,7 @@
 
   .chat-messages {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 1.25rem 1.5rem;
@@ -86,8 +87,12 @@
       width: fit-content;
       box-sizing: border-box;
 
-      @media (max-width: 640px) {
-        max-width: 88%;
+      @media (max-width: 768px) {
+        max-width: 85%;
+      }
+
+      @media (max-width: 480px) {
+        max-width: 90%;
       }
 
       &.outgoing {
@@ -172,7 +177,7 @@
         }
 
         img {
-          max-width: 280px;
+          max-width: min(280px, 100%);
           max-height: 280px;
           width: 100%;
           border-radius: var(--radius-sm);

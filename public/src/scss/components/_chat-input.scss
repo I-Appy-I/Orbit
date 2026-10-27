@@ -9,7 +9,11 @@
   z-index: 20;
 
   @media (max-width: 480px) {
-    padding: 0.5rem 0.75rem;
+    padding: 0.5rem 0.65rem;
+  }
+
+  @media (max-width: 360px) {
+    padding: 0.35rem 0.5rem;
   }
 
   // Attachment Preview
@@ -61,6 +65,14 @@
     align-items: center;
     gap: 0.5rem;
     width: 100%;
+
+    @media (max-width: 480px) {
+      gap: 0.35rem;
+    }
+
+    @media (max-width: 360px) {
+      gap: 0.25rem;
+    }
 
     .button-container {
       display: flex;
@@ -149,8 +161,9 @@
           background-color: var(--bg-surface);
           font-family: inherit;
           width: 290px;
-          max-width: calc(100vw - 2rem);
+          max-width: min(320px, calc(100vw - 1.5rem));
           max-height: min(340px, calc(100vh - 150px));
+          max-height: min(340px, calc(100dvh - 150px));
           transition: background-color 0.2s ease, border-color 0.2s ease;
 
           .emoji-categories {
@@ -296,6 +309,7 @@
     // Main Text Input
     input[type="text"] {
       flex: 1;
+      min-width: 0;
       height: 42px;
       padding: 0 1rem;
       border: 1px solid var(--border);
@@ -306,6 +320,12 @@
       font-size: 0.925rem;
       outline: none;
       transition: var(--transition);
+
+      @media (max-width: 480px) {
+        height: 40px;
+        font-size: 16px;
+        padding: 0 0.75rem;
+      }
 
       &::placeholder {
         color: var(--text-muted);

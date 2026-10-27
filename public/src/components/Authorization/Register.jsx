@@ -133,7 +133,10 @@ function Register({ isLoginActive }) {
           }
         }
       } catch (error) {
-        toast.error(error.response?.data?.msg || "Registration failed", toastOptions);
+        const fallbackMsg = error.message === "Network Error" || !error.response
+          ? "Unable to connect to the server. Please check that the server is running."
+          : "Registration failed";
+        toast.error(error.response?.data?.msg || fallbackMsg, toastOptions);
       } finally {
         setIsSubmitting(false);
       }

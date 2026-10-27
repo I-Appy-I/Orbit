@@ -35,4 +35,21 @@
     color: var(--text-secondary);
     max-width: 360px;
   }
+
+  @media (max-height: 520px), (max-width: 480px) {
+    padding: 1rem;
+
+    img {
+      height: clamp(80px, 15vh, 120px);
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-size: clamp(1.25rem, 4vw, 1.5rem);
+    }
+
+    h3 {
+      font-size: 0.875rem;
+    }
+  }
 }

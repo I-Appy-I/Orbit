@@ -78,6 +78,7 @@
           position: relative;
           display: flex;
           align-items: center;
+          width: 100%;
 
           input {
             width: 100%;
@@ -90,6 +91,10 @@
             font-family: inherit;
             font-size: 0.9rem;
             outline: none;
+
+            @media (max-width: 480px) {
+              font-size: 16px;
+            }
 
             &:focus {
               background-color: var(--bg-surface);
@@ -108,10 +113,14 @@
 
           .password-icon {
             position: absolute;
-            right: 4.5rem;
+            right: 12px;
             cursor: pointer;
             color: var(--text-muted);
             font-size: 1.1rem;
+            padding: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
 
             &:hover {
               color: var(--text-primary);
@@ -133,6 +142,20 @@
 
             &:hover {
               background-color: var(--primary-hover);
+            }
+          }
+
+          &:has(.button-submit) input {
+            padding-right: 4.75rem;
+          }
+
+          &:has(.button-submit):has(.password-icon) {
+            input {
+              padding-right: 6.75rem;
+            }
+
+            .password-icon {
+              right: 4.75rem;
             }
           }
         }

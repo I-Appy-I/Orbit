@@ -46,7 +46,7 @@ const configuredOrigins = (process.env.CLIENT_URL || "")
   .split(",")
   .map((origin) => origin.trim().replace(/\/+$/, ""))
   .filter(Boolean);
-const defaultOrigins = ["http://localhost:3000"];
+const defaultOrigins = ["http://localhost:3000", "http://127.0.0.1:3000"];
 const allowedOrigins = [...new Set([...configuredOrigins, ...defaultOrigins])];
 
 const server = http.createServer(app);

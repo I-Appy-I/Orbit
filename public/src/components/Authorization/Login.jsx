@@ -102,7 +102,10 @@ function Login({ isActive }) {
           });
           toast.error(errorData.msg || "Please verify your email address before logging in.", toastOptions);
         } else {
-          toast.error(errorData?.msg || "Login failed", toastOptions);
+          const fallbackMsg = error.message === "Network Error" || !error.response
+            ? "Unable to connect to the server. Please check that the server is running."
+            : "Login failed";
+          toast.error(errorData?.msg || fallbackMsg, toastOptions);
         }
       } finally {
         setIsSubmitting(false);
