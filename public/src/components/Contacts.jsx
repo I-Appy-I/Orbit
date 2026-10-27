@@ -12,12 +12,13 @@ function Contacts({ fetchAgain, selectedChat, socket }) {
   const [loading, setLoading] = useState(false);
 
   const fetchChats = async () => {
+    if (!user?.token) return;
     try {
-      setLoading(false);
+      setLoading(true);
       const config = { headers: { Authorization: `Bearer ${user.token}` } };
       const { data } = await axios.get(`${fetchChatsRoute}`, config);
       setChats((currentChats) => {
-        const byId = new Map(data.map((chat) => [chat._id, chat]));
+        const byId = new Map((Array.isArray(data) ? data : []).map((chat) => [chat._id, chat]));
         (currentChats || []).forEach((chat) => {
           const existing = byId.get(chat._id);
           if (existing && new Date(chat.updatedAt || 0) >= new Date(existing.updatedAt || 0)) byId.set(chat._id, chat);
@@ -38,14 +39,17 @@ function Contacts({ fetchAgain, selectedChat, socket }) {
       });
       setLoading(false);
     } catch (error) {
-      setLoading(true);
+      setLoading(false);
       toast.error("Failed to load the chats", toastOptions);
     }
   };
-  useEffect(() => {
-    fetchChats(); // eslint-disable-next-line
-  }, [fetchAgain]);
 
+  useEffect(() => {
+    if (user?.token) {
+      fetchChats();
+    }
+    // eslint-disable-next-line
+  }, [fetchAgain, user?.token]);
 
   return (
     <>
@@ -106,11 +110,11 @@ function Contacts({ fetchAgain, selectedChat, socket }) {
                 </>
               )
               : (loading
-                ? <div className="spinner-container chat-loading">
+                ? <div className="spinner-container chat-loading" role="status" aria-label="Loading chats">
                   <div className="loading-spinner">
                   </div>
                 </div>
-                : <div className="chat-loading">
+                : <div className="chat-loading" role="status">
                   <b>Your chat list is empty</b>
                 </div>
               )}

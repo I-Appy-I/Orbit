@@ -1,6 +1,6 @@
 /**
  * In-memory sliding-window rate limiter for sensitive authentication endpoints
- * (registration, login, verify code, and resend verification) to protect against brute-force attacks and abuse.
+ * (registration and login) to protect against brute-force attacks and abuse.
  */
 
 const hitRecords = new Map();
@@ -71,35 +71,9 @@ const loginRateLimiter = createRateLimiter({
   },
 });
 
-// 10 verification attempts per IP/target per 15 minutes
-const verifyCodeRateLimiter = createRateLimiter({
-  windowMs: 15 * 60 * 1000,
-  max: 10,
-  message: "Too many verification attempts. Please try again later.",
-  keyGenerator: (req) => {
-    const ip = req.ip || req.connection?.remoteAddress || "ip";
-    const email = (req.body?.email || req.query?.email || "").trim().toLowerCase();
-    return `${ip}:${email}`;
-  },
-});
-
-// 3 resend attempts per IP/target per 5 minutes
-const resendRateLimiter = createRateLimiter({
-  windowMs: 5 * 60 * 1000,
-  max: 3,
-  message: "Too many verification requests. Please wait a few minutes before trying again.",
-  keyGenerator: (req) => {
-    const ip = req.ip || req.connection?.remoteAddress || "ip";
-    const email = (req.body?.email || "").trim().toLowerCase();
-    return `${ip}:${email}`;
-  },
-});
-
 module.exports = {
   createRateLimiter,
   registerRateLimiter,
   loginRateLimiter,
-  verifyCodeRateLimiter,
-  resendRateLimiter,
   clearRateLimitRecords,
 };

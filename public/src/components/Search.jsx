@@ -7,7 +7,7 @@ import { ChatState } from "../context/ChatProvider";
 import UserListItem from "./Aux/UserListItem";
 import { useEffect, useRef, useState } from "react";
 
-function Search({ searchResults, setSearchResult, socket, searchQuery }) {
+function Search({ searchResults, setSearchResult, socket, searchQuery, searchError = false }) {
   const {
     setSelectedChat,
     user,
@@ -18,7 +18,7 @@ function Search({ searchResults, setSearchResult, socket, searchQuery }) {
 
   useEffect(() => {
     const activeSocket = socket?.current;
-    if (!activeSocket) return undefined;
+    if (!activeSocket || !user?.token || !user?._id) return undefined;
     const handleBlockStatus = (event) => {
       statusRevision.current += 1;
       setSearchResult((current) => current.map((contact) => {
@@ -32,11 +32,12 @@ function Search({ searchResults, setSearchResult, socket, searchQuery }) {
       }));
     };
     const refreshSearchStatus = () => {
+      if (!user?.token || searchError) return;
       const revision = statusRevision.current;
       axios.get(`${allUsersRoute}?search=${encodeURIComponent(searchQuery || "")}`, {
         headers: { Authorization: `Bearer ${user.token}` },
       }).then(({ data }) => {
-        if (revision === statusRevision.current) setSearchResult(data);
+        if (revision === statusRevision.current && Array.isArray(data)) setSearchResult(data);
       }).catch(() => {});
     };
     const handleUserUpdated = (event) => {
@@ -51,13 +52,12 @@ function Search({ searchResults, setSearchResult, socket, searchQuery }) {
     activeSocket.on("block status", handleBlockStatus);
     activeSocket.on("user updated", handleUserUpdated);
     activeSocket.on("connect", refreshSearchStatus);
-    refreshSearchStatus();
     return () => {
       activeSocket.off("block status", handleBlockStatus);
       activeSocket.off("user updated", handleUserUpdated);
       activeSocket.off("connect", refreshSearchStatus);
     };
-  }, [socket, setSearchResult, user._id, user.token, searchQuery]);
+  }, [socket, setSearchResult, user?._id, user?.token, searchQuery, searchError]);
 
   const accessChat = async (userId) => {
     const result = searchResults.find((contact) => contact._id === userId);
@@ -108,7 +108,7 @@ function Search({ searchResults, setSearchResult, socket, searchQuery }) {
   return (
     <>
       <div className="contacts-container search">
-        {searchResults.length !== 0 ? (
+        {searchResults && searchResults.length !== 0 ? (
           <div className="contacts">
             {searchResults?.map((result) => (
               <UserListItem handleFunction={() => accessChat(result._id)}
@@ -119,8 +119,12 @@ function Search({ searchResults, setSearchResult, socket, searchQuery }) {
                 key={result._id} />
             ))}
           </div>
+        ) : searchError ? (
+          <div className="chat-loading search-error" role="alert">
+            <b>Failed to load search results</b>
+          </div>
         ) : (
-          <div className="chat-loading">
+          <div className="chat-loading" role="status">
             <b>No users found</b>
           </div>
         )}

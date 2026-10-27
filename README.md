@@ -4,7 +4,7 @@
 
 ![Orbit Banner](public/src/assets/logo.svg)
 
-**A secure real-time chat application built on the MERN stack (MongoDB, Express, React, Node.js) with Socket.IO, featuring email verification, secure email changes, multi-admin group management, authenticated file attachments, and comprehensive authorization controls.**
+**A secure real-time chat application built on the MERN stack (MongoDB, Express, React, Node.js) with Socket.IO, featuring user authentication, direct profile management, multi-admin group management, authenticated file attachments, and comprehensive authorization controls.**
 
 [![React](https://img.shields.io/badge/React-18.2.0-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D18.16.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
@@ -13,7 +13,7 @@
 [![Socket.IO](https://img.shields.io/badge/Socket.IO-4.8.1-010101?logo=socket.io&logoColor=white)](https://socket.io/)
 [![Helmet](https://img.shields.io/badge/Security-Helmet%208.0-FFDA3E?logo=helmet&logoColor=black)](https://helmetjs.github.io/)
 [![SCSS](https://img.shields.io/badge/Styles-SCSS-CC6699?logo=sass&logoColor=white)](https://sass-lang.com/)
-[![Tests](https://img.shields.io/badge/Tests-158%20Passed-C21325?logo=jest&logoColor=white)](https://jestjs.io/)
+[![Tests](https://img.shields.io/badge/Tests-Jest%20Passing-C21325?logo=jest&logoColor=white)](https://jestjs.io/)
 
 </div>
 
@@ -30,7 +30,6 @@
 - [Environment Configuration](#environment-configuration)
   - [Backend (`server/.env`)](#backend-serverenv)
   - [Frontend (`public/.env`)](#frontend-publicenv)
-  - [Gmail SMTP Setup Guide](#gmail-smtp-setup-guide)
 - [Installation & Local Setup](#installation--local-setup)
   - [Windows (PowerShell)](#windows-powershell)
   - [macOS / Linux (Bash)](#macos--linux-bash)
@@ -56,29 +55,20 @@ Orbit prioritizes user privacy, data security, and operational reliability:
 - **Strict Hybrid Architecture**: All mutations (messages, profile modifications, group management) are authorized and validated through RESTful HTTP endpoints before any Socket.IO events are dispatched.
 - **Private Attachment Access Control**: Uploaded message attachments are never publicly accessible; they require authenticated session tokens and chat membership verification.
 - **Binary Magic Byte Inspection**: Uploaded media undergo binary signature validation to prevent script or executable uploads disguised as images.
-- **Keyed HMAC Verification Codes**: Email verification codes are hashed using HMAC-SHA256 with server-side secrets, protecting against database-dump offline rainbow table attacks.
-- **Secure Email-Change Lifecycle**: Email updates preserve the active verified email until a single-use 6-digit OTP sent to the new address is verified; cancellation immediately clears pending state without locking out the user or breaking session authorization.
-- **Comprehensive Rate Limiting**: Sensitive auth endpoints (registration, login, verify code, resend, email update) are protected by sliding-window rate limiters.
+- **Direct & Frictionless Authentication**: Fast registration and login without external SMTP dependencies, verification barriers, or third-party email providers.
+- **Comprehensive Rate Limiting**: Sensitive auth endpoints (registration, login) are protected by sliding-window rate limiters.
 
 ---
 
 ## Key Features
 
 ### 🔐 Robust Authentication & Account Security
-- **Email Verification with 6-Digit Codes**: Newly registered accounts must verify their email address using a single-use 6-digit numeric verification code delivered via Nodemailer and Gmail SMTP.
-- **Keyed HMAC Code Storage**: Verification codes are hashed using HMAC-SHA256 keyed with server secrets (`EMAIL_VERIFICATION_SECRET` or `JWT_SECRET`); raw codes are never stored or logged in plain text.
-- **Brute-Force & Expiry Protection**: Verification codes expire automatically after 10 minutes and lock after 5 consecutive failed attempts.
-- **Sliding-Window Rate Limiting**: Protects registration, login, code verification, resend, and email update endpoints against automated credential stuffing and brute-force attacks.
-- **Secure Email-Change Workflow**:
-  - Requesting an email update validates the address and records it as `pendingEmail` without altering the user's active verified email or session status.
-  - Generates and dispatches a single-use 6-digit OTP to the **new** address.
-  - The existing email remains fully authoritative, active, and verified throughout the pending change.
-  - Dedicated 6-digit OTP verification UI with auto-focus, paste support, and a 60-second cooldown timer.
-  - Only upon successful code verification is `pendingEmail` atomically promoted to the primary `email`.
-  - Explicit cancellation safely clears the pending state and code, preserving the original email and returning the user to Profile Settings without session interruption or login blocking.
+- **Direct User Registration**: New users can register and immediately begin chatting. Passwords are securely hashed with `bcrypt` (10 salt rounds), and authenticated session tokens are generated instantly.
+- **Sliding-Window Rate Limiting**: Protects registration and login endpoints against automated credential stuffing and brute-force attacks.
+- **Direct Profile Management**:
+  - Authenticated users can modify their own username, email address, profile picture, or password.
+  - Email updates validate format and uniqueness, rejecting duplicates or unauthenticated requests while preserving authorization integrity.
 - **Account Deletion Safety**: Deleting an account safely purges direct chats, blocks, and custom avatars while preserving group chats and messages sent by surviving members.
-- **Unverified Session Gate**: Unverified accounts cannot log in or establish authenticated Socket.IO connections.
-- **Secure Password Hashing**: Passwords are encrypted with `bcrypt` (10 salt rounds).
 - **JWT Authorization**: Authenticated API requests and Socket.IO handshakes require a valid JSON Web Token (`Bearer <token>` or `?token=<token>`).
 
 ### 💬 Real-Time Messaging & Presence
@@ -106,7 +96,6 @@ Orbit prioritizes user privacy, data security, and operational reliability:
 ### 🎨 Theme & Modern Responsive UI
 - **Dual Themes**: Full light-mode and dark-mode support powered by SCSS design tokens and modular mixins.
 - **Responsive Navigation Drawer**: Optimized layout for both desktop widescreen viewports and mobile devices with collapsible navigation drawers.
-- **Accessible 6-Digit OTP Component**: Six dedicated numeric input boxes featuring auto-advancing focus, backspace navigation, clipboard paste support, visible focus rings, and cooldown states.
 
 ---
 
@@ -145,8 +134,7 @@ Orbit employs a hybrid architecture separating state mutation from real-time eve
 | **Security Headers**| [Helmet](https://helmetjs.github.io/) | `^8.0.0` | HTTP security headers (nosniff, HSTS, CORP) |
 | **Security / Auth** | [JSONWebToken](https://github.com/auth0/node-jsonwebtoken) / [Bcrypt](https://www.npmjs.com/package/bcrypt) | `^9.0.0` / `^5.1.0` | Stateless session signing and password hashing |
 | **File Handling** | [Multer](https://github.com/expressjs/multer) | `^2.5.0` | Secure multipart form-data parser with magic byte validation |
-| **Email Transport** | [Nodemailer](https://nodemailer.com/) | `^6.10.1` | SMTP transport client for Gmail transactional mail |
-| **Testing** | [Jest](https://jestjs.io/) / [Supertest](https://github.com/ladjs/supertest) / [RTL](https://testing-library.com/) | Modern | Unit, integration, and UI component test suites (158 passing tests: 103 backend, 55 frontend) |
+| **Testing** | [Jest](https://jestjs.io/) / [Supertest](https://github.com/ladjs/supertest) / [RTL](https://testing-library.com/) | Modern | Unit, integration, and UI component test suites |
 
 ---
 
@@ -173,7 +161,7 @@ chat-app-mern-master/
 │   │   │   ├── ChatInput.jsx    # Text input, file upload trigger, and emoji menu
 │   │   │   ├── Contacts.jsx     # Active chat list, user search, and drawer toggle
 │   │   │   ├── NavigationDrawer.jsx # Slide-out drawer for settings and themes
-│   │   │   ├── RouteGuards.jsx  # Unverified / unauthenticated redirection guards
+│   │   │   ├── RouteGuards.jsx  # Unauthenticated redirection guards
 │   │   │   ├── Search.jsx       # User search modal for initiating conversations
 │   │   │   ├── SingleChat.jsx   # Active chat header, options menu, and status
 │   │   │   ├── UpdateProfile.jsx# User profile, username, email, and password modal
@@ -183,9 +171,9 @@ chat-app-mern-master/
 │   │   │   └── Group/           # Group creation and group settings modals
 │   │   ├── config/              # Helper utilities (ChatLogics, sender formatting)
 │   │   ├── context/             # Global React Context (ChatProvider, state)
-│   │   ├── pages/               # Top-level view routes (Chat, Authorization, VerifyEmail)
+│   │   ├── pages/               # Top-level view routes (Chat, Authorization)
 │   │   ├── scss/                # Modular SCSS styling, mixins, and theme palettes
-│   │   └── utils/               # Axios route maps, constants, and broadcast helpers
+│   │   └── utils/               # Axios route maps and constants
 │
 └── server/                      # Backend Express & Socket.IO Application
     ├── .env                     # Backend environment file (Git ignored)
@@ -203,7 +191,7 @@ chat-app-mern-master/
     ├── model/                   # Mongoose schemas (User, Chat, Message, Block)
     ├── routes/                  # Express REST route definitions
     ├── tests/                   # Backend Jest and Supertest test suites
-    └── utils/                   # Nodemailer email service, DNS config, and group admin helpers
+    └── utils/                   # DNS config and group admin helpers
 ```
 
 ---
@@ -223,8 +211,6 @@ Before setting up Orbit locally, ensure your development environment satisfies:
 3. **MongoDB**:
    - A local MongoDB Community Server instance (`mongodb://127.0.0.1:27017/orbit`) or
    - A free [MongoDB Atlas](https://www.mongodb.com/atlas) cloud cluster (`mongodb+srv://...`).
-4. **Google Account (for Email Verification)**:
-   - A personal Gmail account with **2-Step Verification enabled** to generate a 16-character **App Password**.
 
 ---
 
@@ -245,10 +231,7 @@ MONGODB_URL=mongodb+srv://<username>:<password>@cluster0.mongodb.net/orbit?retry
 # Required: JWT Signing Secret (Minimum 32 characters recommended)
 JWT_SECRET=your_super_secret_jwt_key_at_least_32_chars_long
 
-# Optional: Dedicated Verification Secret for HMAC code hashing (defaults to JWT_SECRET if unset)
-EMAIL_VERIFICATION_SECRET=your_email_verification_secret_here
-
-# Required: Frontend URL(s) (comma-separated if multiple origins, used for CORS and email links)
+# Required: Frontend URL(s) (comma-separated if multiple origins, used for CORS)
 CLIENT_URL=http://localhost:3000
 
 # Optional: Reverse Proxy Configuration (set to "true" when behind Nginx, Render, Heroku, Cloudflare, etc.)
@@ -257,11 +240,6 @@ TRUST_PROXY=false
 # Optional: DNS Override configuration for environments where SRV lookups fail (e.g. Windows Node.js)
 # ENABLE_DNS_OVERRIDE=true
 # DNS_SERVERS=8.8.8.8,1.1.1.1
-
-# Required: Gmail SMTP Configuration for 6-Digit Email Verification
-GMAIL_USER=your_personal_email@gmail.com
-GMAIL_APP_PASSWORD=abcdefghijklmnop
-GMAIL_SENDER_NAME="Orbit"
 ```
 
 > **DNS SRV Resolution Note**: Certain Node.js versions on Windows or restricted local networks fail to resolve MongoDB Atlas SRV records (`_mongodb._tcp...`) with `querySrv ECONNREFUSED`. In such cases, setting `ENABLE_DNS_OVERRIDE=true` and `DNS_SERVERS=8.8.8.8,1.1.1.1` configures Node's DNS resolver via `node:dns` before establishing the database connection.
@@ -285,16 +263,6 @@ REACT_APP_SOCKET_URL=http://localhost:5000
 # REACT_APP_ATTACHMENT_PATHS="http://localhost:5000/api/messages/attachment/"
 ```
 
-### Gmail SMTP Setup Guide
-
-To enable email verification and email-change OTP delivery:
-1. Navigate to your [Google Account Security Settings](https://myaccount.google.com/security).
-2. Enable **2-Step Verification** if not already active.
-3. Open [Google App Passwords](https://myaccount.google.com/apppasswords).
-4. Enter an application name (e.g. `Orbit Chat`) and click **Create**.
-5. Copy the generated 16-character password and assign it to `GMAIL_APP_PASSWORD` in `server/.env` without spaces.
-6. Set `GMAIL_USER` to your Gmail address.
-
 ---
 
 ## Installation & Local Setup
@@ -312,7 +280,7 @@ npm install
 
 # 3. Create and configure server environment file
 Copy-Item -Path .env.example -Destination .env
-# Open server/.env and fill in your MONGODB_URL, JWT_SECRET, and GMAIL credentials
+# Open server/.env and fill in your MONGODB_URL and JWT_SECRET
 
 # 4. Install frontend dependencies
 Set-Location -Path ../public
@@ -362,7 +330,7 @@ npm start
 ## Running Tests & Production Build
 
 ### Backend Tests
-The server test suite uses **Jest** and **Supertest** to execute 103 integration tests across 7 test suites covering authentication, rate limiting, HMAC verification codes, email changes, permissions, contact blocking, message pagination, magic byte file validation, DNS fallbacks, and Socket.IO authorization:
+The server test suite uses **Jest** and **Supertest** to execute integration tests covering authentication, rate limiting, direct email updates, permissions, contact blocking, message pagination, magic byte file validation, DNS fallbacks, and Socket.IO authorization:
 
 ```bash
 cd server
@@ -370,7 +338,7 @@ npm test
 ```
 
 ### Frontend Tests
-The frontend suite uses **React Testing Library** and **Jest** to test UI components, route protection, email verification flows, 6-digit OTP input interactions, profile updates, and chat logic calculations (55 tests across 9 test suites):
+The frontend suite uses **React Testing Library** and **Jest** to test UI components, route protection, profile updates, and chat logic calculations:
 
 ```bash
 cd public
@@ -436,17 +404,12 @@ GET /api/messages/attachment/:filename?token=<your_jwt_token>
 
 | Method | Endpoint | Access | Description |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/auth/register` | Public (Rate-Limited) | Register new user. Accepts `multipart/form-data` with optional `profilePic`. Validates magic bytes. Dispatches 6-digit verification code. |
-| `POST` | `/api/auth/login` | Public (Rate-Limited) | Authenticate user credentials. Rejects unverified accounts with HTTP 403. Returns JWT token. |
+| `POST` | `/api/auth/register` | Public (Rate-Limited) | Register new user. Accepts `multipart/form-data` with optional `profilePic`. Validates magic bytes. Returns user record and JWT session token. |
+| `POST` | `/api/auth/login` | Public (Rate-Limited) | Authenticate user credentials. Returns user record and JWT session token. |
 | `GET` | `/api/auth/me` | Protected | Returns profile data for the authenticated session user. |
-| `POST` | `/api/auth/verify-code` | Public (Rate-Limited) | Verify newly registered account using submitted 6-digit numeric code. Atomically marks verified. |
-| `POST` | `/api/auth/resend-verification` | Public (Rate-Limited) | Resend fresh 6-digit code for unverified accounts. Subject to 60s cooldown rate limiter. |
 | `GET` | `/api/auth/allUsers` | Protected | Fetch directory of all users with mutual block status flags for search. |
 | `PUT` | `/api/auth/renameUser` | Protected | Update username. Broadcasts real-time `user updated` socket event. |
-| `PUT` | `/api/auth/emailUpdate` | Protected (Rate-Limited) | Request email address update. Validates new email, stores `pendingEmail`, and sends 6-digit OTP to new address without altering active email. |
-| `POST` | `/api/auth/verify-email-update` | Protected (Rate-Limited) | Verify 6-digit OTP for pending email change. On success, atomically promotes `pendingEmail` to active email and clears pending fields. |
-| `POST` | `/api/auth/resend-email-update` | Protected (Rate-Limited) | Resend fresh 6-digit OTP to `pendingEmail`. Subject to 60s cooldown rate limiter. |
-| `POST` | `/api/auth/cancel-email-update` | Protected | Cancel pending email change, invalidating outstanding OTP and restoring original profile state. |
+| `PUT` | `/api/auth/emailUpdate` | Protected | Update email address. Validates new email format and uniqueness, updating user email directly. |
 | `PUT` | `/api/auth/passwordUpdate` | Protected | Update user password after validating existing password. |
 | `PUT` | `/api/auth/profilePicUpdate` | Protected | Upload new profile image (`multipart/form-data`) with magic byte validation. |
 | `PUT` | `/api/auth/deleteUser` | Protected | Permanently delete user profile, direct chats, and avatar while preserving group chat messages. |
@@ -497,22 +460,20 @@ Orbit implements defense-in-depth across the entire application stack:
    - GIF: `47 49 46 38`
    - WEBP: `RIFF` ... `WEBP`
    Disguised scripts or executable files are immediately unlinked and rejected with HTTP 400.
-3. **Keyed HMAC Verification Codes**:
-   6-digit verification codes are hashed using `crypto.createHmac("sha256", secret)` before storage in MongoDB. Even if the database is compromised, active codes cannot be rainbow-tabled or brute-forced offline without the server-side HMAC secret.
-4. **Rate Limiting on Sensitive Auth Endpoints**:
-   Custom sliding-window rate limiters protect registration (10 req/15min), login (15 req/15min), code verification (10 req/15min), and code resends (3 req/5min with 60s cooldown).
-5. **Security Headers with Helmet**:
+3. **Rate Limiting on Sensitive Auth Endpoints**:
+   Custom sliding-window rate limiters protect registration (10 req/15min) and login (15 req/15min) against automated abuse.
+4. **Security Headers with Helmet**:
    Express integrates `helmet()` to enforce `X-Content-Type-Options: nosniff`, HSTS, X-Frame-Options (`DENY`), and DNS prefetch controls, with cross-origin resource policy configured for avatar embedding.
-6. **Data Privacy**:
+5. **Data Privacy**:
    Message sender population explicitly excludes the `email` field (`populate("sender", "username profilePic")`), preventing participant email addresses from leaking in message histories or Socket.IO payloads.
-7. **Strict Socket Handshake Authentication**:
-   Socket.IO connections execute a JWT verification middleware upon connection. Unverified or expired tokens are rejected immediately.
-8. **Guarded Room Join Logic**:
+6. **Strict Socket Handshake Authentication**:
+   Socket.IO connections execute a JWT verification middleware upon connection. Missing, unverified, or expired tokens are rejected immediately.
+7. **Guarded Room Join Logic**:
    When a client requests `socket.emit("join chat", roomId)`, the server verifies that `socket.user._id` exists in the `chat.users` membership array. Unauthorized clients cannot eavesdrop on rooms.
-9. **No Direct Socket Ingestion**:
+8. **No Direct Socket Ingestion**:
    The server intercepts `socket.on("new message")` and emits an error instructing the client to use the authenticated REST endpoint, preventing spoofed message creation.
-10. **JSON Body Limits**:
-    Body parser size is constrained to `1mb` to prevent large payload Denial of Service attacks.
+9. **JSON Body Limits**:
+   Body parser size is constrained to `1mb` to prevent large payload Denial of Service attacks.
 
 ---
 
@@ -557,13 +518,9 @@ Orbit is architected as a two-tier system: an Express.js & Socket.IO backend cou
   - `MONGODB_URL=mongodb+srv://...`
   - `JWT_SECRET=<strong_random_secret_at_least_32_chars>`
   - `CLIENT_URL=https://your-frontend-domain.com` (matches frontend origin for CORS)
-  - `GMAIL_USER=your_personal_email@gmail.com`
-  - `GMAIL_APP_PASSWORD=your_16_char_app_password`
 - **Optional Environment Variables**:
-  - `EMAIL_VERIFICATION_SECRET=<strong_random_secret>` (recommended for dedicated HMAC code hashing)
   - `TRUST_PROXY=true` (must be set when deployed behind a reverse proxy or load balancer so client IP rate limiters function correctly)
   - `ENABLE_DNS_OVERRIDE=true` and `DNS_SERVERS=8.8.8.8,1.1.1.1` (only if the hosting environment's resolver cannot resolve Atlas SRV records)
-  - `GMAIL_SENDER_NAME="Orbit"`
 - **Persistent File Storage Considerations**:
   - Orbit's Multer upload middleware stores files on local disk under `server/images/profile_pictures` and `server/images/attachments`.
   - On platforms with ephemeral container filesystems (e.g. standard Render web services or Heroku dynos), redeploying or restarting containers clears locally stored uploads.
@@ -580,7 +537,7 @@ Orbit is architected as a two-tier system: an Express.js & Socket.IO backend cou
   - `REACT_APP_SOCKET_URL=https://your-backend-api.onrender.com`
   - `REACT_APP_LOCALHOST_KEY="chat-app-user"`
 - **Single Page Application Routing**:
-  Ensure hosting rewrites redirect all non-file route requests to `/index.html` (e.g., via `vercel.json` or `_redirects` for Netlify) so client-side React routes (`/chat`, `/verify-email`) resolve properly on browser refresh.
+  Ensure hosting rewrites redirect all non-file route requests to `/index.html` (e.g., via `vercel.json` or `_redirects` for Netlify) so client-side React routes (`/chat`, `/login`, `/register`) resolve properly on browser refresh.
 
 ### 3. Production Readiness Considerations
 

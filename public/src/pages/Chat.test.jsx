@@ -255,4 +255,29 @@ describe("Chat component - Search Navigation", () => {
     });
     expect(updatedSelected.users[1].username).toBe("BobNew");
   });
+  test("search with zero matches displays 'No users found' without error toast", async () => {
+    axios.get.mockResolvedValueOnce({ data: [] });
+
+    renderChat();
+
+    const searchInput = screen.getByPlaceholderText(/search or start new chat/i);
+    fireEvent.change(searchInput, { target: { value: "nonexistent" } });
+    fireEvent.submit(searchInput.closest("form"));
+
+    await screen.findByText(/no users found/i);
+    expect(screen.queryByText(/error in searching user/i)).not.toBeInTheDocument();
+  });
+
+  test("search failure displays 'Failed to load search results' and does not disguise error as empty", async () => {
+    axios.get.mockRejectedValueOnce(new Error("Network Error"));
+
+    renderChat();
+
+    const searchInput = screen.getByPlaceholderText(/search or start new chat/i);
+    fireEvent.change(searchInput, { target: { value: "errorUser" } });
+    fireEvent.submit(searchInput.closest("form"));
+
+    await screen.findByText(/failed to load search results/i);
+    expect(screen.queryByText(/no users found/i)).not.toBeInTheDocument();
+  });
 });

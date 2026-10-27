@@ -44,13 +44,22 @@ function UpdateProfile({ fetchAgain, setFetchAgain, onClose }) {
     const [showConfirm, setShowConfirm] = useState(false);
 
     const handleLocalStorage = (data) => {
-        if (data.status === true) {
-            localStorage.setItem(
-                process.env.REACT_APP_LOCALHOST_KEY,
-                JSON.stringify(data.updatedUser)
-            );
+        if (data?.status === true && data.updatedUser) {
+            try {
+                const stored = JSON.parse(localStorage.getItem(process.env.REACT_APP_LOCALHOST_KEY) || "{}");
+                const nextUser = { ...stored, ...data.updatedUser };
+                localStorage.setItem(
+                    process.env.REACT_APP_LOCALHOST_KEY,
+                    JSON.stringify(nextUser)
+                );
+            } catch (e) {
+                localStorage.setItem(
+                    process.env.REACT_APP_LOCALHOST_KEY,
+                    JSON.stringify(data.updatedUser)
+                );
+            }
         }
-    }
+    };
 
     const handleRename = async () => {
         setShowUsernameInput(false);
@@ -73,12 +82,16 @@ function UpdateProfile({ fetchAgain, setFetchAgain, onClose }) {
             setFetchAgain(!fetchAgain);
             toast.success("your username was changed successfully", toastOptions);
         } catch (error) {
-            toast.error(error.response.data.message, toastOptions);
+            toast.error(error.response?.data?.message || "Failed to update username", toastOptions);
         }
         setNewUsername("");
     };
 
     const handleEmail = async () => {
+        if (!user?.token) {
+            toast.error("You must be logged in to update your email", toastOptions);
+            return;
+        }
         if (!newEmail || typeof newEmail !== "string" || !newEmail.trim()) {
             toast.error("Please enter a new email address", toastOptions);
             return;
@@ -112,21 +125,20 @@ function UpdateProfile({ fetchAgain, setFetchAgain, onClose }) {
             );
 
             if (data.status) {
-                toast.success(data.msg || "Verification code sent to your new email!", toastOptions);
+                toast.success(data.msg || "Email updated successfully!", toastOptions);
                 setShowEmailInput(false);
                 setNewEmail("");
-                if (typeof onClose === "function") {
-                    onClose();
-                }
-                navigate(`/verify-email?mode=email-change&email=${encodeURIComponent(cleanEmail)}`);
+                setUser(data.updatedUser);
+                handleLocalStorage(data);
+                setFetchAgain(!fetchAgain);
             } else {
-                toast.error(data.msg || "Failed to request email change", toastOptions);
+                toast.error(data.msg || "Failed to update email", toastOptions);
             }
         } catch (error) {
             const errorMsg =
                 error.response?.data?.msg ||
                 error.response?.data?.message ||
-                "Failed to send verification code. Please try again.";
+                "Failed to update email. Please try again.";
             toast.error(errorMsg, toastOptions);
         } finally {
             setEmailLoading(false);
@@ -175,7 +187,7 @@ function UpdateProfile({ fetchAgain, setFetchAgain, onClose }) {
             else toast.error("response.data.message", toastOptions);
             setFetchAgain(!fetchAgain);
         } catch (error) {
-            toast.error(error.response.data.message, toastOptions);
+            toast.error(error.response?.data?.message || "Failed to update password", toastOptions);
         }
         setOldPassword("");
         setNewPassword("");
@@ -267,7 +279,7 @@ function UpdateProfile({ fetchAgain, setFetchAgain, onClose }) {
                                         onClick={handleEmail}
                                         disabled={emailLoading}
                                     >
-                                        {emailLoading ? "Sending..." : "Save"}
+                                        {emailLoading ? "Saving..." : "Save"}
                                     </button>
                                 </div>)
                                 : (<div className="modal-input not-show">

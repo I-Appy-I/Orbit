@@ -33,6 +33,7 @@ function Chat() {
   const [fetchAgain, setFetchAgain] = useState(false);
   const [searchResults, setSearchResult] = useState([]);
   const [search, setSearch] = useState('');
+  const [searchError, setSearchError] = useState(false);
   const [navState, setNavState] = useState("start");
   const [profileSettingsOpen, setProfileSettingsOpen] = useState(() => {
     return (
@@ -67,6 +68,7 @@ function Chat() {
     searchRequestIdRef.current += 1;
     setSearch("");
     setSearchResult([]);
+    setSearchError(false);
     setNavState("start");
     setLoading(false);
   };
@@ -79,9 +81,14 @@ function Chat() {
       toast.error("Please Enter something in search", toastOptions);
       return;
     }
+    if (!user?.token) {
+      toast.error("Authentication required to search users", toastOptions);
+      return;
+    }
     const currentRequestId = ++searchRequestIdRef.current;
     try {
       setLoading(true);
+      setSearchError(false);
       setNavState("add-trip");
       const config = {
         headers: {
@@ -90,11 +97,14 @@ function Chat() {
       };
       const { data } = await axios.get(`${allUsersRoute}?search=${encodeURIComponent(query)}`, config);
       if (currentRequestId === searchRequestIdRef.current) {
-        setSearchResult(data);
+        setSearchResult(Array.isArray(data) ? data : []);
+        setSearchError(false);
         setLoading(false);
       }
     } catch (error) {
       if (currentRequestId === searchRequestIdRef.current) {
+        setSearchResult([]);
+        setSearchError(true);
         setLoading(false);
         toast.error("Error in searching user", toastOptions);
       }
@@ -107,6 +117,7 @@ function Chat() {
     if (!value) {
       searchRequestIdRef.current += 1;
       setSearchResult([]);
+      setSearchError(false);
       setNavState("start");
       setLoading(false);
     }
@@ -407,7 +418,7 @@ function Chat() {
                           </div>
                         </div>
                       )
-                      : (<Search socket={socket} searchResults={searchResults} setSearchResult={setSearchResult} searchQuery={search} />)
+                      : (<Search socket={socket} searchResults={searchResults} setSearchResult={setSearchResult} searchQuery={search} searchError={searchError} />)
                     )
                   }
                 </div>

@@ -105,31 +105,30 @@ describe("Socket.IO Authentication & Authorization", () => {
     });
   });
 
-  it("should reject connection when user email is not verified", async () => {
-    const unverifiedUser = await User.create({
-      username: "unverifiedSocket",
-      email: "unverified@example.com",
+  it("should allow connection for user regardless of legacy emailVerified status", async () => {
+    const userWithLegacyField = await User.create({
+      username: "legacySocketUser",
+      email: "legacysocket@example.com",
       password: "password1",
       emailVerified: false,
     });
-    const unverifiedToken = generateToken(unverifiedUser._id);
+    const legacyToken = generateToken(userWithLegacyField._id);
 
     return new Promise((resolve) => {
       const client = ioClient(serverUrl, {
         transports: ["websocket"],
         reconnection: false,
-        auth: { token: unverifiedToken },
+        auth: { token: legacyToken },
       });
 
-      client.on("connect_error", (err) => {
-        expect(err.message).toMatch(/Email not verified/);
+      client.on("connected", () => {
         client.close();
         resolve();
       });
     });
   });
 
-  it("should connect successfully when valid token is provided and receive 'connected'", (done) => {
+    it("should connect successfully when valid token is provided and receive 'connected'", (done) => {
     const client = ioClient(serverUrl, {
       transports: ["websocket"],
       auth: { token: token1 },

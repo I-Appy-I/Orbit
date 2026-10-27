@@ -30,11 +30,7 @@ function initializeSocket(io) {
         return next(new Error("Authentication error: User not found"));
       }
 
-      if (!user.emailVerified) {
-        return next(new Error("Authentication error: Email not verified"));
-      }
-
-      // Attach verified user to socket instance
+      // Attach user to socket instance
       socket.user = user;
       return next();
     } catch (err) {
@@ -51,7 +47,7 @@ function initializeSocket(io) {
 
     // Backward-compatibility: "setup" event
     socket.on("setup", () => {
-      // Always enforce verified user id, never trust any client-supplied id
+      // Always enforce authenticated user id, never trust any client-supplied id
       socket.join(userId);
       socket.emit("connected");
     });

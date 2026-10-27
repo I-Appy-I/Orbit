@@ -5,7 +5,6 @@ const User = require("../model/userModel");
 const Chat = require("../model/chatModel");
 const Messages = require("../model/messageModel");
 const { generateToken } = require("../config/generateToken");
-const { _getSentEmails, _clearSentEmails } = require("../utils/emailService");
 
 beforeAll(async () => {
   await connectDB();
@@ -17,9 +16,6 @@ afterAll(async () => {
 
 beforeEach(async () => {
   await clearDB();
-  _clearSentEmails();
-  process.env.GMAIL_USER = "test_user@gmail.com";
-  process.env.GMAIL_APP_PASSWORD = "test_app_password";
 });
 
 describe("Resource Authorization & IDOR Protection", () => {
@@ -375,34 +371,7 @@ describe("Resource Authorization & IDOR Protection", () => {
     });
   });
 
-  describe("Email Update Integrity & Pending OTP Verification Flow", () => {
-    it("should send OTP to new email address without modifying current email or emailVerified status", async () => {
-      const res = await request(app)
-        .put("/api/auth/emailUpdate")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ newEmail: "alice_new@example.com" });
-
-      expect(res.status).toBe(200);
-      expect(res.body.status).toBe(true);
-      expect(res.body.pendingEmail).toBe("alice_new@example.com");
-
-      // Verify original user record was not modified prematurely
-      const refreshed = await User.findById(userA._id).select(
-        "+pendingEmailVerificationTokenHash +pendingEmailVerificationExpires"
-      );
-      expect(refreshed.email).toBe("alice@example.com"); // Remains original email
-      expect(refreshed.emailVerified).toBe(true); // Remains verified
-      expect(refreshed.pendingEmail).toBe("alice_new@example.com");
-      expect(refreshed.pendingEmailVerificationTokenHash).toBeDefined();
-      expect(refreshed.pendingEmailVerificationExpires).toBeDefined();
-
-      // Verify email was sent to NEW address with 6-digit code
-      const sent = _getSentEmails();
-      expect(sent.length).toBe(1);
-      expect(sent[0].to).toBe("alice_new@example.com");
-      expect(sent[0]._code).toMatch(/^\d{6}$/);
-    });
-
+  describe("Direct Profile Email Updates", () => {
     it("should reject updating email to the same email address", async () => {
       const res = await request(app)
         .put("/api/auth/emailUpdate")
@@ -433,312 +402,49 @@ describe("Resource Authorization & IDOR Protection", () => {
       expect(res.body.msg).toMatch(/valid email/i);
     });
 
-    it("should handle email delivery failure gracefully without updating pending email", async () => {
-      process.env.GMAIL_USER = "simulate_failure";
-
+    it("should directly update email for authenticated user without sending OTP or verification codes", async () => {
       const res = await request(app)
         .put("/api/auth/emailUpdate")
         .set("Authorization", `Bearer ${tokenA}`)
-        .send({ newEmail: "alice_failed@example.com" });
+        .send({ newEmail: "alice_updated@example.com" });
 
-      expect(res.status).toBe(500);
-      expect(res.body.status).toBe(false);
-
-      const refreshed = await User.findById(userA._id);
-      expect(refreshed.email).toBe("alice@example.com");
-      expect(refreshed.pendingEmail).toBeUndefined();
-    });
-
-    it("should enforce 60-second cooldown between email change requests", async () => {
-      // First request
-      const res1 = await request(app)
-        .put("/api/auth/emailUpdate")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ newEmail: "alice_new1@example.com" });
-      expect(res1.status).toBe(200);
-
-      // Immediate second request
-      const res2 = await request(app)
-        .put("/api/auth/emailUpdate")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ newEmail: "alice_new2@example.com" });
-
-      expect(res2.status).toBe(429);
-      expect(res2.body.error).toBe("rate_limited");
-      expect(res2.body.retryAfter).toBeGreaterThan(0);
-    });
-
-    it("should verify OTP and promote pendingEmail to email while preserving emailVerified: true", async () => {
-      // Request change
-      await request(app)
-        .put("/api/auth/emailUpdate")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ newEmail: "alice_new@example.com" });
-
-      const sent = _getSentEmails();
-      expect(sent.length).toBe(1);
-      const code = sent[0]._code;
-
-      // Submit verification
-      const verifyRes = await request(app)
-        .post("/api/auth/verify-email-update")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ code });
-
-      expect(verifyRes.status).toBe(200);
-      expect(verifyRes.body.status).toBe(true);
-      expect(verifyRes.body.user.email).toBe("alice_new@example.com");
-      expect(verifyRes.body.user.emailVerified).toBe(true);
-      expect(verifyRes.body.user.token).toBeDefined();
+      expect(res.status).toBe(200);
+      expect(res.body.status).toBe(true);
+      expect(res.body.msg).toMatch(/Email updated successfully/i);
+      expect(res.body.user.email).toBe("alice_updated@example.com");
+      expect(res.body.user.token).toBeDefined();
 
       // Database check
-      const refreshed = await User.findById(userA._id).select(
-        "+pendingEmailVerificationTokenHash +pendingEmailVerificationExpires"
-      );
-      expect(refreshed.email).toBe("alice_new@example.com");
-      expect(refreshed.emailVerified).toBe(true);
+      const refreshed = await User.findById(userA._id);
+      expect(refreshed.email).toBe("alice_updated@example.com");
       expect(refreshed.pendingEmail).toBeUndefined();
       expect(refreshed.pendingEmailVerificationTokenHash).toBeUndefined();
     });
 
-    it("should reject incorrect OTP and decrement remaining attempts", async () => {
-      await request(app)
+    it("should reject unauthenticated email update requests", async () => {
+      const res = await request(app)
         .put("/api/auth/emailUpdate")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ newEmail: "alice_new@example.com" });
+        .send({ newEmail: "unauth@example.com" });
 
-      const verifyRes = await request(app)
-        .post("/api/auth/verify-email-update")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ code: "000000" });
-
-      expect(verifyRes.status).toBe(400);
-      expect(verifyRes.body.status).toBe(false);
-      expect(verifyRes.body.error).toBe("incorrect_code");
-      expect(verifyRes.body.remainingAttempts).toBe(4);
-
-      // Ensure original email is intact
-      const refreshed = await User.findById(userA._id);
-      expect(refreshed.email).toBe("alice@example.com");
+      expect(res.status).toBe(401);
     });
 
-    it("should reject expired OTP", async () => {
-      await request(app)
-        .put("/api/auth/emailUpdate")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ newEmail: "alice_new@example.com" });
-
-      // Expire code in DB
-      await User.findByIdAndUpdate(userA._id, {
-        pendingEmailVerificationExpires: new Date(Date.now() - 1000),
-      });
-
-      const sent = _getSentEmails();
-      const code = sent[0]._code;
-
-      const verifyRes = await request(app)
+    it("should return 404 for removed email change OTP endpoints", async () => {
+      const verifyUpdate = await request(app)
         .post("/api/auth/verify-email-update")
         .set("Authorization", `Bearer ${tokenA}`)
-        .send({ code });
+        .send({ code: "123456" });
+      expect(verifyUpdate.status).toBe(404);
 
-      expect(verifyRes.status).toBe(400);
-      expect(verifyRes.body.error).toBe("expired");
-
-      const refreshed = await User.findById(userA._id);
-      expect(refreshed.email).toBe("alice@example.com");
-    });
-
-    it("should allow resending OTP for pending email with 60s cooldown", async () => {
-      await request(app)
-        .put("/api/auth/emailUpdate")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ newEmail: "alice_new@example.com" });
-
-      _clearSentEmails();
-
-      // Immediate resend should be rate-limited
-      const resend1 = await request(app)
+      const resendUpdate = await request(app)
         .post("/api/auth/resend-email-update")
         .set("Authorization", `Bearer ${tokenA}`);
+      expect(resendUpdate.status).toBe(404);
 
-      expect(resend1.status).toBe(429);
-
-      // Fast-forward cooldown in DB
-      await User.findByIdAndUpdate(userA._id, {
-        pendingEmailVerificationLastSent: new Date(Date.now() - 65 * 1000),
-      });
-
-      const resend2 = await request(app)
-        .post("/api/auth/resend-email-update")
-        .set("Authorization", `Bearer ${tokenA}`);
-
-      expect(resend2.status).toBe(200);
-      expect(resend2.body.status).toBe(true);
-
-      const sent = _getSentEmails();
-      expect(sent.length).toBe(1);
-      expect(sent[0].to).toBe("alice_new@example.com");
-    });
-
-    it("should preserve original email if user cancels email change", async () => {
-      await request(app)
-        .put("/api/auth/emailUpdate")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ newEmail: "alice_new@example.com" });
-
-      const cancelRes = await request(app)
+      const cancelUpdate = await request(app)
         .post("/api/auth/cancel-email-update")
         .set("Authorization", `Bearer ${tokenA}`);
-
-      expect(cancelRes.status).toBe(200);
-
-      const refreshed = await User.findById(userA._id);
-      expect(refreshed.email).toBe("alice@example.com");
-      expect(refreshed.pendingEmail).toBeUndefined();
-    });
-
-    it("should prevent subsequent login from being blocked after initiating and cancelling an email change", async () => {
-      // Re-hash password for bcrypt compare in login
-      const bcrypt = require("bcrypt");
-      const hashedPassword = await bcrypt.hash("passwordA123", 10);
-      await User.findByIdAndUpdate(userA._id, { password: hashedPassword });
-
-      // Start email change
-      await request(app)
-        .put("/api/auth/emailUpdate")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ newEmail: "alice_cancelled@example.com" });
-
-      // Cancel email change
-      const cancelRes = await request(app)
-        .post("/api/auth/cancel-email-update")
-        .set("Authorization", `Bearer ${tokenA}`);
-      expect(cancelRes.status).toBe(200);
-
-      // Verify login succeeds without being blocked or forced to verify
-      const loginRes = await request(app)
-        .post("/api/auth/login")
-        .send({
-          username: "userAlice",
-          password: "passwordA123",
-        });
-
-      expect(loginRes.status).toBe(200);
-      expect(loginRes.body.status).toBe(true);
-      expect(loginRes.body.email).toBe("alice@example.com");
-      expect(loginRes.body.emailVerified).toBe(true);
-      expect(loginRes.body.token).toBeDefined();
-    });
-
-    it("should reject verification when code was cancelled or outdated", async () => {
-      await request(app)
-        .put("/api/auth/emailUpdate")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ newEmail: "alice_new@example.com" });
-
-      const sent = _getSentEmails();
-      const code = sent[0]._code;
-
-      // Cancel change
-      await request(app)
-        .post("/api/auth/cancel-email-update")
-        .set("Authorization", `Bearer ${tokenA}`);
-
-      // Submitting code after cancellation must be rejected
-      const verifyRes = await request(app)
-        .post("/api/auth/verify-email-update")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ code });
-
-      expect(verifyRes.status).toBe(400);
-      expect(verifyRes.body.msg).toMatch(/No pending email change request/i);
-    });
-
-    it("should reject reusing a code that has already been verified", async () => {
-      await request(app)
-        .put("/api/auth/emailUpdate")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ newEmail: "alice_once@example.com" });
-
-      const sent = _getSentEmails();
-      const code = sent[0]._code;
-
-      // First verification succeeds
-      const verify1 = await request(app)
-        .post("/api/auth/verify-email-update")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ code });
-      expect(verify1.status).toBe(200);
-
-      // Second verification using the same code must fail
-      const verify2 = await request(app)
-        .post("/api/auth/verify-email-update")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ code });
-      expect(verify2.status).toBe(400);
-    });
-
-    it("should prevent User B from verifying or modifying User A's pending email change", async () => {
-      await request(app)
-        .put("/api/auth/emailUpdate")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ newEmail: "alice_protected@example.com" });
-
-      const sent = _getSentEmails();
-      const code = sent[0]._code;
-
-      // User B attempts to verify User A's code
-      const verifyB = await request(app)
-        .post("/api/auth/verify-email-update")
-        .set("Authorization", `Bearer ${tokenB}`)
-        .send({ code, userId: userA._id.toString() });
-
-      expect(verifyB.status).toBe(400);
-      expect(verifyB.body.msg).toMatch(/No pending email change request/i);
-
-      // User A's pending email is untouched
-      const refreshedA = await User.findById(userA._id);
-      expect(refreshedA.pendingEmail).toBe("alice_protected@example.com");
-      expect(refreshedA.email).toBe("alice@example.com");
-    });
-
-    it("should keep registration verification independent from email change", async () => {
-      // User A starts email change
-      await request(app)
-        .put("/api/auth/emailUpdate")
-        .set("Authorization", `Bearer ${tokenA}`)
-        .send({ newEmail: "alice_independent@example.com" });
-
-      _clearSentEmails();
-
-      // Register a new unverified user
-      const regRes = await request(app)
-        .post("/api/auth/register")
-        .send({
-          username: "reguser",
-          email: "reguser@example.com",
-          password: "password123",
-        });
-
-      expect(regRes.status).toBe(201);
-      const regSent = _getSentEmails();
-      expect(regSent.length).toBe(1);
-      const regCode = regSent[0]._code;
-
-      // Verify registration via /api/auth/verify-code
-      const regVerify = await request(app)
-        .post("/api/auth/verify-code")
-        .send({
-          email: "reguser@example.com",
-          code: regCode,
-        });
-
-      expect(regVerify.status).toBe(200);
-
-      // Verify User A's pending email was not touched by registration verification
-      const refreshedA = await User.findById(userA._id);
-      expect(refreshedA.pendingEmail).toBe("alice_independent@example.com");
-      expect(refreshedA.email).toBe("alice@example.com");
+      expect(cancelUpdate.status).toBe(404);
     });
   });
 });

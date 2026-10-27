@@ -49,18 +49,12 @@ export const getAttachmentUrl = (filename, token) => {
 export const loginRoute = `${host}/api/auth/login`;
 export const registerRoute = `${host}/api/auth/register`;
 export const currentUserRoute = `${host}/api/auth/me`;
-export const verifyEmailRoute = `${host}/api/auth/verify-email`;
-export const verifyCodeRoute = `${host}/api/auth/verify-code`;
-export const resendVerificationRoute = `${host}/api/auth/resend-verification`;
 
 export const allUsersRoute = `${host}/api/auth/allUsers`;
 export const deleteUserRoute = `${host}/api/auth/deleteUser`;
 
 export const renameUserRoute = `${host}/api/auth/renameUser`;
 export const emailUpdateRoute = `${host}/api/auth/emailUpdate`;
-export const verifyEmailUpdateRoute = `${host}/api/auth/verify-email-update`;
-export const resendEmailUpdateRoute = `${host}/api/auth/resend-email-update`;
-export const cancelEmailUpdateRoute = `${host}/api/auth/cancel-email-update`;
 export const profilePicUpdateRoute = `${host}/api/auth/profilePicUpdate`;
 export const passwordUpdateRoute = `${host}/api/auth/passwordUpdate`;
 

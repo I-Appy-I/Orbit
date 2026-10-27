@@ -38,7 +38,7 @@ jest.mock("../context/ChatProvider", () => ({
 
 import UpdateProfile from "./UpdateProfile";
 
-describe("UpdateProfile - Email Change Flow", () => {
+describe("UpdateProfile - Direct Email Update", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.REACT_APP_LOCALHOST_KEY = "chat_app_user";
@@ -85,13 +85,21 @@ describe("UpdateProfile - Email Change Flow", () => {
     expect(screen.getByPlaceholderText("alice@example.com")).toBeInTheDocument();
   });
 
-  it("should send verification request and navigate to /verify-email on success", async () => {
+  it("should update email directly, save to localStorage, update state, and close edit form without navigating to /verify-email", async () => {
     const mockOnClose = jest.fn();
+    const updatedUserData = {
+      _id: "user123",
+      username: "alice",
+      email: "alice_new@example.com",
+      profilePic: "",
+      isAdmin: false,
+      token: "new_jwt_token_456",
+    };
     axios.put.mockResolvedValueOnce({
       data: {
         status: true,
-        msg: "A 6-digit verification code has been sent to your new email address.",
-        pendingEmail: "alice_new@example.com",
+        msg: "Email updated successfully!",
+        updatedUser: updatedUserData,
       },
     });
 
@@ -119,11 +127,12 @@ describe("UpdateProfile - Email Change Flow", () => {
     );
 
     await waitFor(() => {
-      expect(mockOnClose).toHaveBeenCalled();
-      expect(mockNavigate).toHaveBeenCalledWith(
-        "/verify-email?mode=email-change&email=alice_new%40example.com"
-      );
+      expect(mockSetUser).toHaveBeenCalledWith(updatedUserData);
+      expect(mockNavigate).not.toHaveBeenCalled();
     });
+
+    // Edit input should be closed
+    expect(screen.queryByPlaceholderText("alice@example.com")).not.toBeInTheDocument();
   });
 
   it("should stay on email-edit form when backend request fails", async () => {
@@ -132,7 +141,7 @@ describe("UpdateProfile - Email Change Flow", () => {
       response: {
         data: {
           status: false,
-          msg: "Failed to send verification code. Please check the address or try again later.",
+          msg: "The email is already used",
         },
       },
     });
@@ -147,7 +156,7 @@ describe("UpdateProfile - Email Change Flow", () => {
     fireEvent.click(updateBtns[1]);
 
     const input = screen.getByPlaceholderText("alice@example.com");
-    fireEvent.change(input, { target: { value: "alice_smtp_fail@example.com" } });
+    fireEvent.change(input, { target: { value: "alice_dup@example.com" } });
 
     const saveBtn = screen.getByRole("button", { name: /Save/i });
     await act(async () => {
@@ -159,7 +168,7 @@ describe("UpdateProfile - Email Change Flow", () => {
       expect(mockNavigate).not.toHaveBeenCalled();
     });
 
-    // CRITICAL: User stays on the edit form
+    // User stays on the edit form
     expect(screen.getByPlaceholderText("alice@example.com")).toBeInTheDocument();
   });
 });
